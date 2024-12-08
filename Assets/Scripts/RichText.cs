@@ -118,6 +118,51 @@ namespace SS.UIComponent
         #endregion
 
         readonly UIVertex[] m_TempVerts = new UIVertex[4];
+        private float spaceWidth;
+
+        private IconProvider _iconProvider;
+        private IconProvider iconProvider
+        {
+            get
+            {
+                if (_iconProvider == null)
+                {
+                    _iconProvider = GetComponent<IconProvider>();
+                }
+                
+                return _iconProvider;
+            }
+        }
+        
+        private RichTextIconImage _iconImage;
+        private RichTextIconImage iconImage
+        {
+            get
+            {
+                if (_iconImage == null)
+                {
+                    var image = GetComponentInChildren<RichTextIconImage>();
+                    if (image != null)
+                    {
+                        _iconImage = image;
+                    }
+                    else
+                    {
+                        var go = new GameObject("RichText IconImage");
+                        go.transform.SetParent(transform, false);
+                        var rectTrans = go.AddComponent<RectTransform>();
+                        rectTrans.anchorMin = Vector2.zero;
+                        rectTrans.anchorMax = Vector2.one;
+                        rectTrans.sizeDelta = Vector2.zero;
+                        rectTrans.pivot = rectTransform.pivot;
+                        _iconImage = go.AddComponent<RichTextIconImage>();
+                        _iconImage.raycastTarget = false;
+                    }
+                }
+                
+                return _iconImage;
+            }
+        }
 
         #endregion
 
@@ -192,11 +237,21 @@ namespace SS.UIComponent
             var vertCount = verts.Count;
             
             // 处理富文本效果
+            var icons = new List<Sprite>();
+            var iconVerts = new List<UIVertex[]>();
             foreach (var richInfo in richInfos)
             {
                 switch (richInfo.Type)
                 {
                     case RichType.Icon:
+                    {
+                        var icon = ApplyIcon(richInfo, verts, vertCount);
+                        if (icon.icon != null)
+                        {
+                            icons.Add(icon.icon);
+                            iconVerts.Add(icon.verts);
+                        }
+                    }
                         break;
                     case RichType.Outline:
                         ApplyOutlineEffect(richInfo, verts, vertCount);
@@ -232,6 +287,18 @@ namespace SS.UIComponent
                     if (tempVertsIndex == 3)
                         toFill.AddUIVertexQuad(m_TempVerts);
                 }
+
+                for (int i = 0; i < iconVerts.Count; i++)
+                {
+                    var tempVerts = iconVerts[i];
+
+                    for (int j = 0; j < 4; j++)
+                    {
+                        tempVerts[i].position *= unitsPerPixel;
+                        tempVerts[i].position.x += roundingOffset.x;
+                        tempVerts[i].position.y += roundingOffset.y;
+                    }
+                }
             }
             else
             {
@@ -243,6 +310,24 @@ namespace SS.UIComponent
                     if (tempVertsIndex == 3)
                         toFill.AddUIVertexQuad(m_TempVerts);
                 }
+                
+                for (int i = 0; i < iconVerts.Count; i++)
+                {
+                    var tempVerts = iconVerts[i];
+
+                    for (int j = 0; j < 4; j++)
+                    {
+                        tempVerts[i].position *= unitsPerPixel;
+                    }
+                }
+            }
+
+            // 处理图标
+            iconImage.gameObject.SetActive(icons.Count > 0);
+            if (icons.Count > 0)
+            {
+                // 避免同时更新渲染
+                StartCoroutine(CallIconUpdate(icons, iconVerts));
             }
 
             m_DisableFontTextureRebuiltCallback = false;
@@ -283,8 +368,6 @@ namespace SS.UIComponent
             // 描边
             var outlineMatches = OutlineRegex.Matches(resultText);
             var outlineEndMatches = OutlineEndRegex.Matches(resultText);
-            // 只算成对的
-            // var outlineCount = Mathf.Min(outlineMatches.Count, outlineEndMatches.Count);
             for (int i = 0; i < outlineMatches.Count; i++)
             {
                 var startMatch = outlineMatches[i];
@@ -329,8 +412,6 @@ namespace SS.UIComponent
             // 阴影
             var shadowMatches = ShadowRegex.Matches(resultText);
             var shadowEndMatches = ShadowEndRegex.Matches(resultText);
-            // 只算成对的
-            // var shadowCount = Mathf.Min(shadowMatches.Count, shadowEndMatches.Count);
             for (int i = 0; i < shadowMatches.Count; i++)
             {
                 var startMatch = shadowMatches[i];
@@ -540,11 +621,13 @@ namespace SS.UIComponent
                         richInfos.Add(new RichInfo()
                         {
                             Type = RichType.Icon,
+                            Content = tag.Content,
                             StartIndex = tag.Index - offset,
                             EndIndex = tag.Index - offset,
                         });
 
-                        offset += tag.Length;
+                        // 去掉替换出来的一个字符
+                        offset += tag.Length - 1;
                         // subStrPairs.Add((tag.Index, tag.Length));
                         continue;
                     }
@@ -600,7 +683,9 @@ namespace SS.UIComponent
                 resultText = resultText.Remove(strPair.start, strPair.length);
             }
 
-            resultText = IconRegex.Replace(resultText, " ");
+            // 占位字符，到时候要将alpha设置为0
+            // 可以保证有嵌套size的情况下可以生成正确的顶点
+            resultText = IconRegex.Replace(resultText, "〇");
 
             return richInfos;
         }
@@ -640,6 +725,7 @@ namespace SS.UIComponent
                 v.x += -1;
                 v.y += 1;
                 vt.position = v;
+                vt.color.a = (byte)(vt.color.a / 2);
                 verts[i] = vt;
             }
         }
@@ -672,6 +758,54 @@ namespace SS.UIComponent
 
             for(int i = start; i < end; i++)
                 verts.Add(verts[i]);
+        }
+
+        private (Sprite icon, UIVertex[] verts) ApplyIcon(RichInfo richInfo, IList<UIVertex> verts, int vertCount)
+        {
+            var iconName = richInfo.Content;
+            var iconSprite = iconProvider.GetIcon(iconName);
+            var start = richInfo.StartIndex * 4;
+            var end = start + 4;
+            var iconVerts = new UIVertex[4];
+            for (int i = start; i < end; i++)
+            {
+                // 将原字符设置为透明
+                var vert = verts[i];
+                vert.color.a = 0;
+                verts[i] = vert;
+
+                // 整理图标
+                var iconVert = vert;
+                vert.color.a = 255;
+                iconVerts[i - start] = iconVert;
+            }
+
+            // 找不到图标就不走后续了
+            if (iconSprite == null)
+            {
+                return (null, null);
+            }
+            
+            // 图标纹理的UV坐标
+            // Vector2 uv0 = new Vector2(iconSprite.textureRect.xMin / iconSprite.texture.width, iconSprite.textureRect.yMin / iconSprite.texture.height);
+            // Vector2 uv1 = new Vector2(iconSprite.textureRect.xMax / iconSprite.texture.width, iconSprite.textureRect.yMax / iconSprite.texture.height);
+            // 设置UV坐标
+            // iconVerts[0].uv0 = uv0;
+            // iconVerts[1].uv0 = new Vector2(uv1.x, uv0.y);
+            // iconVerts[2].uv0 = uv1;
+            // iconVerts[3].uv0 = new Vector2(uv0.x, uv1.y);
+            
+            return (iconSprite, iconVerts);
+        }
+
+        #endregion
+
+        #region Coroutine
+
+        IEnumerator CallIconUpdate(List<Sprite> sprites, List<UIVertex[]> vertices)
+        {
+            yield return null;
+            iconImage.SetIcons(sprites, vertices);
         }
 
         #endregion
