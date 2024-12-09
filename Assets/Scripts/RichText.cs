@@ -238,7 +238,8 @@ namespace SS.UIComponent
             var vertCount = verts.Count;
             
             // 处理富文本效果
-            var icons = new List<Sprite>();
+            var iconNames = new List<string>();
+            var icons = new Dictionary<string, Sprite>();
             var iconVerts = new List<UIVertex[]>();
             foreach (var richInfo in richInfos)
             {
@@ -246,10 +247,11 @@ namespace SS.UIComponent
                 {
                     case RichType.Icon:
                     {
-                        var icon = ApplyIcon(richInfo, verts, vertCount);
+                        var icon = ApplyIcon(richInfo, verts, icons);
                         if (icon.icon != null)
                         {
-                            icons.Add(icon.icon);
+                            iconNames.Add(richInfo.Content);
+                            icons.TryAdd(richInfo.Content, icon.icon);
                             iconVerts.Add(icon.verts);
                         }
                     }
@@ -295,9 +297,9 @@ namespace SS.UIComponent
 
                     for (int j = 0; j < 4; j++)
                     {
-                        tempVerts[i].position *= unitsPerPixel;
-                        tempVerts[i].position.x += roundingOffset.x;
-                        tempVerts[i].position.y += roundingOffset.y;
+                        tempVerts[j].position *= unitsPerPixel;
+                        tempVerts[j].position.x += roundingOffset.x;
+                        tempVerts[j].position.y += roundingOffset.y;
                     }
                 }
             }
@@ -318,17 +320,17 @@ namespace SS.UIComponent
 
                     for (int j = 0; j < 4; j++)
                     {
-                        tempVerts[i].position *= unitsPerPixel;
+                        tempVerts[j].position *= unitsPerPixel;
                     }
                 }
             }
 
             // 处理图标
-            iconImage.gameObject.SetActive(icons.Count > 0);
-            if (icons.Count > 0)
+            iconImage.gameObject.SetActive(iconNames.Count > 0);
+            if (iconNames.Count > 0)
             {
                 // 避免同时更新渲染
-                StartCoroutine(CallIconUpdate(icons, iconVerts));
+                StartCoroutine(CallIconUpdate(iconNames, icons, iconVerts));
             }
 
             m_DisableFontTextureRebuiltCallback = false;
@@ -772,10 +774,15 @@ namespace SS.UIComponent
                 verts.Add(verts[i]);
         }
 
-        private (Sprite icon, UIVertex[] verts) ApplyIcon(RichInfo richInfo, IList<UIVertex> verts, int vertCount)
+        private (Sprite icon, UIVertex[] verts) ApplyIcon(RichInfo richInfo, IList<UIVertex> verts, Dictionary<string, Sprite> iconCache)
         {
             var iconName = richInfo.Content;
-            var iconSprite = iconProvider.GetIcon(iconName);
+            Sprite iconSprite;
+            if (!iconCache.TryGetValue(iconName, out iconSprite))
+            {
+                iconSprite = iconProvider.GetIcon(iconName);
+            }
+            
             var start = richInfo.StartIndex * 4;
             var end = start + 4;
             var iconVerts = new UIVertex[4];
@@ -798,15 +805,6 @@ namespace SS.UIComponent
                 return (null, null);
             }
             
-            // 图标纹理的UV坐标
-            // Vector2 uv0 = new Vector2(iconSprite.textureRect.xMin / iconSprite.texture.width, iconSprite.textureRect.yMin / iconSprite.texture.height);
-            // Vector2 uv1 = new Vector2(iconSprite.textureRect.xMax / iconSprite.texture.width, iconSprite.textureRect.yMax / iconSprite.texture.height);
-            // 设置UV坐标
-            // iconVerts[0].uv0 = uv0;
-            // iconVerts[1].uv0 = new Vector2(uv1.x, uv0.y);
-            // iconVerts[2].uv0 = uv1;
-            // iconVerts[3].uv0 = new Vector2(uv0.x, uv1.y);
-            
             return (iconSprite, iconVerts);
         }
 
@@ -814,10 +812,10 @@ namespace SS.UIComponent
 
         #region Coroutine
 
-        IEnumerator CallIconUpdate(List<Sprite> sprites, List<UIVertex[]> vertices)
+        IEnumerator CallIconUpdate(List<string> iconNames, Dictionary<string, Sprite> icons, List<UIVertex[]> vertices)
         {
             yield return null;
-            iconImage.SetIcons(sprites, vertices);
+            iconImage.SetIcons(iconNames, icons, vertices);
         }
 
         #endregion

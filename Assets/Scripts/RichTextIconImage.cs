@@ -14,42 +14,26 @@ namespace SS.UIComponent
     {
         #region properties
 
-        private List<Sprite> _sprites;
+        private List<string> _sprites;
         private List<UIVertex[]> _vertices;
 
         #endregion
         
         #region Public Methods
 
-        public void SetIcons(List<Sprite> sprites, List<UIVertex[]> vertices)
+        public void SetIcons(List<string> iconNames, Dictionary<string, Sprite> icons, List<UIVertex[]> vertices)
         {
-            _sprites = sprites;
+            _sprites = iconNames;
             _vertices = vertices;
             if (_sprites.Count == 1)
             {
-                sprite = _sprites[0];
+                sprite = icons[_sprites[0]];
             }
             else
             {
-                sprite = CombineSprites();
+                sprite = CombineSprites(icons);
             }
 
-            SetVerticesDirty();
-        }
-        
-        public void SetIcons(List<(Sprite, UIVertex[])> sprites)
-        {
-            _sprites = sprites.Select(x => x.Item1).ToList();
-            _vertices = sprites.Select(x => x.Item2).ToList();
-            if (_sprites.Count == 1)
-            {
-                sprite = _sprites[0];
-            }
-            else
-            {
-                sprite = CombineSprites();
-            }
-            
             SetVerticesDirty();
         }
 
@@ -88,14 +72,15 @@ namespace SS.UIComponent
 
         #region Private Methods
 
-        private Sprite CombineSprites()
+        private Sprite CombineSprites(Dictionary<string, Sprite> icons)
         {
             // 获取所有图标的尺寸
             var totalWidth = 0;
             var maxHeight = 0;
-            
-            foreach (var sprite in _sprites)
+
+            foreach (var kvp in icons)
             {
+                var sprite = kvp.Value;
                 totalWidth += (int)sprite.rect.width;
                 maxHeight = Mathf.Max(maxHeight, (int)sprite.rect.height);
             }
@@ -104,29 +89,38 @@ namespace SS.UIComponent
             Texture2D combinedTexture = new Texture2D(totalWidth, maxHeight);
             combinedTexture.filterMode = FilterMode.Bilinear;
             combinedTexture.wrapMode = TextureWrapMode.Repeat;
-            
+
+            var iconUvs = new Dictionary<string, Vector4>(icons.Count);
+            var index = 0;
             var currentX = 0;
-            for (int i = 0; i < _sprites.Count; i++)
+            foreach (var kvp in icons)
             {
-                var sprite = _sprites[i];
+                var sprite = kvp.Value;
                 var texture = sprite.texture;
                 var spriteRect = sprite.rect;
 
                 // 计算图标的UV坐标
                 var uv = new Vector4((spriteRect.x + currentX) / totalWidth, spriteRect.y / maxHeight,
                     (spriteRect.width + currentX) / totalWidth, spriteRect.height / maxHeight);
-                var verts = _vertices[i];
-                // uv是x y左下， z w右上，但这里顶点实际上是从左上开始的顺时针
-                verts[0].uv0 = new Vector2(uv.x, uv.w);
-                verts[1].uv0 = new Vector2(uv.z, uv.w);
-                verts[2].uv0 = new Vector2(uv.z, uv.y);
-                verts[3].uv0 = new Vector2(uv.x, uv.y);
-
+                iconUvs.TryAdd(kvp.Key, uv);
+                
                 // 将图标的像素数据拷贝到大纹理
                 Color[] pixels = texture.GetPixels((int)spriteRect.x, (int)spriteRect.y, (int)spriteRect.width, (int)spriteRect.height);
                 combinedTexture.SetPixels(currentX, 0, (int)spriteRect.width, (int)spriteRect.height, pixels);
 
                 currentX += (int)spriteRect.width; // 更新x坐标
+            }
+
+            for (int i = 0; i < _sprites.Count; i++)
+            {
+                var sprite = _sprites[i];
+                var verts = _vertices[i];
+                var uv = iconUvs[sprite];
+                // uv是x y左下， z w右上，但这里顶点实际上是从左上开始的顺时针
+                verts[0].uv0 = new Vector2(uv.x, uv.w);
+                verts[1].uv0 = new Vector2(uv.z, uv.w);
+                verts[2].uv0 = new Vector2(uv.z, uv.y);
+                verts[3].uv0 = new Vector2(uv.x, uv.y);
             }
 
             combinedTexture.Apply();  // 更新纹理
