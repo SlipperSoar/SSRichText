@@ -7,12 +7,13 @@
 
 支持的富文本标签：
 
-|            标签             | 效果 |                   注释                    |
-|:-------------------------:|:--:|:---------------------------------------:|
-|         \<b>\</b>         | 粗体 |                 unity原生                 |
-|         \<i>\</i>         | 斜体 |                 unity原生                 |
-|      \<size>\</size>      | 大小 |                 unity原生                 |
-|   \<color=red>\</color>   | 颜色 |                 unity原生                 |
-| \<outline=red>\</outline> | 描边 | \<outline=red>或\<outline=#ffffffff>设置颜色 |
-|    \<shadow>\</shadow>    | 阴影 |                   ...                   |
-|       \<icon=xxxx/>       | 图标 |           需要配合IconProvider使用            |
+|             标签             | 效果  |                     注释                      |
+|:--------------------------:|:---:|:-------------------------------------------:|
+|         \<b>\</b>          | 粗体  |                   unity原生                   |
+|         \<i>\</i>          | 斜体  |                   unity原生                   |
+|      \<size>\</size>       | 大小  |                   unity原生                   |
+|   \<color=red>\</color>    | 颜色  |                   unity原生                   |
+| \<outline=red>\</outline>  | 描边  |   \<outline=red>或\<outline=#ffffffff>设置颜色   |
+|    \<shadow>\</shadow>     | 阴影  |                     ...                     |
+|       \<icon=xxxx/>        | 图标  |             需要配合IconProvider使用              |
+| \<underline>\</underline>  | 下划线 | \<underline=red>或\<underline=#ffffffff>设置颜色 |

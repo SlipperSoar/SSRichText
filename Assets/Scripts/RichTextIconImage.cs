@@ -14,20 +14,20 @@ namespace SS.UIComponent
     {
         #region properties
 
-        private List<string> _sprites;
+        private List<RichText.RichInfo> _sprites;
         private List<UIVertex[]> _vertices;
 
         #endregion
         
         #region Public Methods
 
-        public void SetIcons(List<string> iconNames, Dictionary<string, Sprite> icons, List<UIVertex[]> vertices)
+        public void SetIcons(List<RichText.RichInfo> iconInfos, Dictionary<string, Sprite> icons, List<UIVertex[]> vertices)
         {
-            _sprites = iconNames;
+            _sprites = iconInfos;
             _vertices = vertices;
             if (_sprites.Count == 1)
             {
-                sprite = icons[_sprites[0]];
+                sprite = icons[_sprites[0].Content];
             }
             else
             {
@@ -51,12 +51,13 @@ namespace SS.UIComponent
             // 这里处理图标的渲染
             for (int i = 0; i < _sprites.Count; i++)
             {
+                var info = _sprites[i];
                 var verts = _vertices[i];
                 
-                verts[0].color = color;
-                verts[1].color = color;
-                verts[2].color = color;
-                verts[3].color = color;
+                verts[0].color = color * info.Color;
+                verts[1].color = color * info.Color;
+                verts[2].color = color * info.Color;
+                verts[3].color = color * info.Color;
                 
                 toFill.AddVert(verts[0]);
                 toFill.AddVert(verts[1]);
@@ -113,9 +114,9 @@ namespace SS.UIComponent
 
             for (int i = 0; i < _sprites.Count; i++)
             {
-                var sprite = _sprites[i];
+                var info = _sprites[i];
                 var verts = _vertices[i];
-                var uv = iconUvs[sprite];
+                var uv = iconUvs[info.Content];
                 // uv是x y左下， z w右上，但这里顶点实际上是从左上开始的顺时针
                 verts[0].uv0 = new Vector2(uv.x, uv.w);
                 verts[1].uv0 = new Vector2(uv.z, uv.w);

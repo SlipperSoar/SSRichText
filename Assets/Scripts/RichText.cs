@@ -19,7 +19,7 @@ namespace SS.UIComponent
     {
         #region inner enum/struct
 
-        private enum RichType
+        public enum RichType
         {
             /// <summary>斜体</summary>
             Italic,
@@ -35,6 +35,8 @@ namespace SS.UIComponent
             Outline,
             /// <summary>阴影</summary>
             Shadow,
+            /// <summary>下划线</summary>
+            Underline,
         }
         
         private class TagInfo
@@ -47,7 +49,7 @@ namespace SS.UIComponent
             public Color Color;
         }
 
-        private class RichInfo
+        public class RichInfo
         {
             public RichType Type;
             /// <summary>富文本开始的位置（包含）</summary>
@@ -106,15 +108,23 @@ namespace SS.UIComponent
         private readonly Regex SizeEndRegex = new Regex(SizeEndRegexText);
         
         // 追加的富文本
+        // 描边
         private static readonly string OutlineRegexText = @"<outline=((#[0-9a-f]{6})|(" + GetColorWords() + @"))>";
         private const string OutlineEndRegexText = @"</outline>";
         private readonly Regex OutlineRegex = new Regex(OutlineRegexText, RegexOptions.IgnoreCase);
         private readonly Regex OutlineEndRegex = new Regex(OutlineEndRegexText);
 
+        // 阴影
         private const string ShadowRegexText = @"<shadow>";
         private const string ShadowEndRegexText = @"</shadow>";
         private readonly Regex ShadowRegex = new Regex(ShadowRegexText);
         private readonly Regex ShadowEndRegex = new Regex(ShadowEndRegexText);
+        
+        // 下划线
+        private static readonly string UnderlineRegexText = @"<underline=((#[0-9a-f]{6})|(" + GetColorWords() + @"))>";
+        private const string UnderlineEndRegexText = @"</underline>";
+        private readonly Regex UnderlineRegex = new Regex(UnderlineRegexText);
+        private readonly Regex UnderlineEndRegex = new Regex(UnderlineEndRegexText);
 
         #endregion
 
@@ -164,6 +174,9 @@ namespace SS.UIComponent
                 return _iconImage;
             }
         }
+
+        private Sprite _whiteQuad;
+        private const string UnderlineSpriteName = "<underline>";
 
         #endregion
 
@@ -238,7 +251,8 @@ namespace SS.UIComponent
             var vertCount = verts.Count;
             
             // 处理富文本效果
-            var iconNames = new List<string>();
+            // 图标的（下划线也用）
+            var iconInfos = new List<RichInfo>();
             var icons = new Dictionary<string, Sprite>();
             var iconVerts = new List<UIVertex[]>();
             foreach (var richInfo in richInfos)
@@ -250,7 +264,7 @@ namespace SS.UIComponent
                         var icon = ApplyIcon(richInfo, verts, icons);
                         if (icon.icon != null)
                         {
-                            iconNames.Add(richInfo.Content);
+                            iconInfos.Add(richInfo);
                             icons.TryAdd(richInfo.Content, icon.icon);
                             iconVerts.Add(icon.verts);
                         }
@@ -261,6 +275,16 @@ namespace SS.UIComponent
                         break;
                     case RichType.Shadow:
                         ApplyShadowEffect(richInfo, verts, vertCount);
+                        break;
+                    case RichType.Underline:
+                    {
+                        richInfo.Content = UnderlineSpriteName;
+                        var underlineVerts = ApplyUnderlineEffect(richInfo, verts, vertCount);
+                        CheckAndCreateWhite2x2Quad();
+                        iconInfos.Add(richInfo);
+                        icons.TryAdd(richInfo.Content, _whiteQuad);
+                        iconVerts.Add(underlineVerts);
+                    }
                         break;
                 }
             }
@@ -326,11 +350,11 @@ namespace SS.UIComponent
             }
 
             // 处理图标
-            iconImage.gameObject.SetActive(iconNames.Count > 0);
-            if (iconNames.Count > 0)
+            iconImage.gameObject.SetActive(iconInfos.Count > 0);
+            if (iconInfos.Count > 0)
             {
                 // 避免同时更新渲染
-                StartCoroutine(CallIconUpdate(iconNames, icons, iconVerts));
+                StartCoroutine(CallIconUpdate(iconInfos, icons, iconVerts));
             }
 
             m_DisableFontTextureRebuiltCallback = false;
@@ -362,7 +386,8 @@ namespace SS.UIComponent
                     IsClose = true,
                     Index = index,
                     Length = length,
-                    Content = iconName
+                    Content = iconName,
+                    Color = Color.white,
                 };
                 
                 tags.Add(tagInfo);
@@ -591,6 +616,50 @@ namespace SS.UIComponent
 
                 tags.Add(tagInfo);
             }
+            
+            // 下划线
+            var underlineMatches = UnderlineRegex.Matches(resultText);
+            var underlineEndMatches = UnderlineEndRegex.Matches(resultText);
+            for (int i = 0; i < underlineMatches.Count; i++)
+            {
+                var startMatch = underlineMatches[i];
+                var startIndex = startMatch.Index;
+                var startLength = startMatch.Length;
+                var colorStr = startMatch.Groups[1].Value;
+
+                Color color;
+                if (!Colors.TryGetValue(colorStr, out color))
+                {
+                    ColorUtility.TryParseHtmlString(colorStr, out color);
+                }
+
+                var tagInfo = new TagInfo()
+                {
+                    Type = RichType.Underline,
+                    Index = startIndex,
+                    Length = startLength,
+                    Color = color,
+                };
+                
+                tags.Add(tagInfo);
+            }
+            
+            for (int i = 0; i < underlineEndMatches.Count; i++)
+            {
+                var endMatch = underlineEndMatches[i];
+                var endIndex = endMatch.Index;
+                var endLength = endMatch.Length;
+                
+                var tagInfo = new TagInfo()
+                {
+                    Type = RichType.Underline,
+                    IsClose = true,
+                    Index = endIndex,
+                    Length = endLength,
+                };
+
+                tags.Add(tagInfo);
+            }
 
             // 空格的位置
             var spaceIndexes = new Queue<int>(GetWhiteSpaceIndexesInString(richText));
@@ -627,6 +696,7 @@ namespace SS.UIComponent
                             Content = tag.Content,
                             StartIndex = tag.Index - offset,
                             EndIndex = tag.Index - offset,
+                            Color = tag.Color,
                         });
 
                         // 去掉替换出来的一个字符
@@ -651,11 +721,15 @@ namespace SS.UIComponent
                     richInfo.EndIndex = tag.Index - offset;
                     offset += tag.Length;
                     richInfos.Add(richInfo);
-                    // 只删掉自定义的标签
+                    // 只删掉自定义的标签 = 不动原有标签
                     switch (richInfo.Type)
                     {
-                        case RichType.Shadow:
-                        case RichType.Outline:
+                        case RichType.Bold:
+                        case RichType.Color:
+                        case RichType.Italic:
+                        case RichType.Size:
+                            break;
+                        default:
                             subStrPairs.Add((top.Index, top.Length));
                             subStrPairs.Add((tag.Index, tag.Length));
                             break;
@@ -774,6 +848,9 @@ namespace SS.UIComponent
                 verts.Add(verts[i]);
         }
 
+        /// <summary>
+        /// 图标效果
+        /// </summary>
         private (Sprite icon, UIVertex[] verts) ApplyIcon(RichInfo richInfo, IList<UIVertex> verts, Dictionary<string, Sprite> iconCache)
         {
             var iconName = richInfo.Content;
@@ -808,14 +885,74 @@ namespace SS.UIComponent
             return (iconSprite, iconVerts);
         }
 
+        /// <summary>
+        /// 下划线效果
+        /// </summary>
+        private UIVertex[] ApplyUnderlineEffect(RichInfo richInfo, IList<UIVertex> verts, int vertCount)
+        {
+            // 顶点顺序是左上顺时针到左下
+            int start = richInfo.StartIndex * 4;
+            // 要添加下划线的最后一个字符的右下角顶点索引
+            int end = Mathf.Min(richInfo.EndIndex * 4, vertCount) - 2;
+            var underlineHeight = 2.0f;
+            var padding = 2f;
+            
+            // 下划线的四个顶点
+            UIVertex[] underlineVerts = new UIVertex[4];
+            // 起止坐标
+            float startX = verts[start].position.x;
+            float endX = verts[end].position.x;
+            float endY = verts[end].position.y;
+            // 计算下划线的四个顶点
+            underlineVerts[0] = new UIVertex
+            {
+                position = new Vector3(startX, endY - padding, 0),
+                color = richInfo.Color, // 下划线颜色
+            };
+            underlineVerts[1] = new UIVertex
+            {
+                position = new Vector3(endX, endY - padding, 0),
+                color = richInfo.Color,
+            };
+            underlineVerts[2] = new UIVertex
+            {
+                position = new Vector3(endX, endY - padding - underlineHeight, 0),
+                color = richInfo.Color,
+            };
+            underlineVerts[3] = new UIVertex
+            {
+                position = new Vector3(startX, endY - padding - underlineHeight, 0),
+                color = richInfo.Color,
+            };
+
+            return underlineVerts;
+        }
+
+        /// <summary>
+        /// 检查并在需要时生成白色2x2纹理
+        /// </summary>
+        private void CheckAndCreateWhite2x2Quad()
+        {
+            if (_whiteQuad == null)
+            {
+                var size = 8;
+                Texture2D tex = new Texture2D(size, size);
+                Color[] colors = new Color[size * size];
+                Array.Fill(colors, Color.white);
+                tex.SetPixels(colors);
+                tex.Apply();
+                _whiteQuad = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f));
+            }
+        }
+        
         #endregion
 
         #region Coroutine
 
-        IEnumerator CallIconUpdate(List<string> iconNames, Dictionary<string, Sprite> icons, List<UIVertex[]> vertices)
+        IEnumerator CallIconUpdate(List<RichInfo> iconInfos, Dictionary<string, Sprite> icons, List<UIVertex[]> vertices)
         {
             yield return null;
-            iconImage.SetIcons(iconNames, icons, vertices);
+            iconImage.SetIcons(iconInfos, icons, vertices);
         }
 
         #endregion
