@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using System.Text.RegularExpressions;
 using UnityEditor;
 using UnityEngine;
@@ -674,13 +675,24 @@ namespace SS.UIComponent
                 }
             }
 
-            // 从后往前 倒序排序
-            subStrPairs.Sort((a, b) => b.start - a.start);
             // 最后统一替换
-            for (var i = 0; i < subStrPairs.Count; i++)
+            if (subStrPairs.Count > 0)
             {
-                var strPair = subStrPairs[i];
-                resultText = resultText.Remove(strPair.start, strPair.length);
+                // 从前往后顺序排序
+                subStrPairs.Sort((a, b) => a.start - b.start);
+                var resultStrBuilder = new StringBuilder();
+                var index = 0;
+                for (var i = 0; i < subStrPairs.Count; i++)
+                {
+                    var strPair = subStrPairs[i];
+                    resultStrBuilder.Append(resultText[index..strPair.start]);
+                    index = strPair.start + strPair.length;
+                }
+                
+                // 加上最后的字符串
+                resultStrBuilder.Append(resultText[index..]);
+
+                resultText = resultStrBuilder.ToString();
             }
 
             // 占位字符，到时候要将alpha设置为0
