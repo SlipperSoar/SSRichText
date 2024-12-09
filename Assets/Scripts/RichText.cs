@@ -729,7 +729,7 @@ namespace SS.UIComponent
         private void ApplyShadowEffect(RichInfo richInfo, IList<UIVertex> verts, int vertCount)
         {
             int start = richInfo.StartIndex * 4;
-            int end = Mathf.Min(richInfo.EndIndex * 4 + 4, vertCount);
+            int end = Mathf.Min(richInfo.EndIndex * 4, vertCount);
             UIVertex vt;
             for(int i = start; i < end; i++)
             {
