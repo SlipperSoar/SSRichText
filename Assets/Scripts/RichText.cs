@@ -62,6 +62,8 @@ namespace SS.UIComponent
             /// <summary>顶点颜色</summary>
             public Color Color;
 
+            /// <summary>受影响的文本内容</summary>
+            public string EffectedStr;
             /// <summary>
             /// 富文本区域对应的所有矩形
             /// x, y => 左下， z, w => 右上
@@ -79,6 +81,8 @@ namespace SS.UIComponent
         
         #region properties
 
+        public event Action<string> OnClick;
+        
         /// <summary>可以直接使用的颜色单词</summary>
         private static Dictionary<string, Color> Colors = new Dictionary<string, Color>()
         {
@@ -98,6 +102,9 @@ namespace SS.UIComponent
 
         private static readonly Regex IconRegex = new Regex(@"<icon=([a-zA-Z0-9_\-\(\)\.]+)/>");
 
+        // white space
+        private readonly Regex WhiteSpaceRegex = new Regex(@"\s+");
+        
         // Unity基础的富文本
         // 斜体
         private const string ItalicRegexText = @"<i>";
@@ -391,13 +398,41 @@ namespace SS.UIComponent
 
         public void OnPointerClick(PointerEventData eventData)
         {
-            Debug.Log($"Click pos: {eventData.position}");
             RectTransformUtility.ScreenPointToLocalPointInRectangle(rectTransform, eventData.position,
                 eventData.pressEventCamera, out var lp);
-            Debug.Log($"Click pos in local: {lp}");
+            
+            RichInfo target = null;
             foreach (var richInfo in richInfos)
             {
-                //
+                var rects = richInfo.Rects;
+                foreach (var rect in rects)
+                {
+                    if (rect.x <= lp.x && rect.z >= lp.x && rect.y <= lp.y && rect.w >= lp.y)
+                    {
+                        target = richInfo;
+                        break;
+                    }
+                }
+
+                if (target != null)
+                {
+                    break;
+                }
+            }
+
+            if (target != null)
+            {
+                var message = string.Empty;
+                if (target.Type == RichType.Icon)
+                {
+                    message = target.Content;
+                }
+                else
+                {
+                    message = target.EffectedStr;
+                }
+
+                OnClick?.Invoke(message);
             }
         }
 
@@ -745,7 +780,7 @@ namespace SS.UIComponent
                             Type = RichType.Icon,
                             Content = tag.Content,
                             StartIndex = tag.Index - offset,
-                            EndIndex = tag.Index - offset,
+                            EndIndex = tag.Index - offset + 1,
                             Color = tag.Color,
                         });
 
@@ -824,6 +859,23 @@ namespace SS.UIComponent
             // 占位字符，到时候要将alpha设置为0
             // 可以保证有嵌套size的情况下可以生成正确的顶点
             resultText = IconRegex.Replace(resultText, "〇");
+            
+            // 为了得到准确的字符串，这里要去掉所有的富文本标签了
+            var tempText = BoldRegex.Replace(resultText, "");
+            tempText = BoldEndRegex.Replace(tempText, "");
+            tempText = ItalicRegex.Replace(tempText, "");
+            tempText = ItalicEndRegex.Replace(tempText, "");
+            tempText = ColorRegex.Replace(tempText, "");
+            tempText = ColorEndRegex.Replace(tempText, "");
+            tempText = SizeRegex.Replace(tempText, "");
+            tempText = SizeEndRegex.Replace(tempText, "");
+            // 然后去掉white space
+            tempText = WhiteSpaceRegex.Replace(tempText, "");
+
+            foreach (var richInfo in richInfos)
+            {
+                richInfo.EffectedStr = tempText[richInfo.StartIndex..richInfo.EndIndex];
+            }
 
             return richInfos;
         }
@@ -1007,7 +1059,6 @@ namespace SS.UIComponent
 
         private static void CalculateRects(RichInfo richInfo, IList<UIVertex> vertices)
         {
-            var vertCount = vertices.Count;
             richInfo.Rects = new List<Vector4>();
             richInfo.RectIndexes = new List<int[]>();
             var startIndex = richInfo.StartIndex;
@@ -1042,7 +1093,7 @@ namespace SS.UIComponent
                     {
                         if (rect.z < 0)
                         {
-                            var vert = vertices[i * 4 - 2];
+                            var vert = vertices[i * 4 - 3];
                             rect.z = vert.position.x;
                             rect.w = vert.position.y;
                             state = 0;
