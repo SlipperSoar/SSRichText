@@ -6,6 +6,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 using ColorUtility = UnityEngine.ColorUtility;
 
@@ -15,7 +16,7 @@ namespace SS.UIComponent
     /// 对富文本支持更广泛的UI文本组件
     /// </summary>
     [AddComponentMenu("UI/SS/RichText")]
-    public class RichText : Text
+    public class RichText : Text, IPointerClickHandler
     {
         #region inner enum/struct
 
@@ -56,10 +57,22 @@ namespace SS.UIComponent
             public int StartIndex;
             /// <summary>富文本结束的位置（不包含）</summary>
             public int EndIndex;
-            /// <summary>富文本类型，根据具体类型决定这个content要怎么使用</summary>
+            /// <summary>根据具体类型决定这个content要怎么使用</summary>
             public string Content;
             /// <summary>顶点颜色</summary>
             public Color Color;
+
+            /// <summary>
+            /// 富文本区域对应的所有矩形
+            /// x, y => 左下， z, w => 右上
+            /// </summary>
+            public List<Vector4> Rects;
+
+            /// <summary>
+            /// 富文本区域对应的每个矩形的起止索引
+            /// 0 => 开始索引， 1 => 结束索引
+            /// </summary>
+            public List<int[]> RectIndexes;
         }
 
         #endregion
@@ -180,6 +193,8 @@ namespace SS.UIComponent
         private Sprite _whiteQuad;
         private const string UnderlineSpriteName = "<underline>";
 
+        private List<RichInfo> richInfos;
+
         #endregion
 
         #region static
@@ -243,7 +258,7 @@ namespace SS.UIComponent
                 return;
             
             // 文本处理
-            var richInfos = ProcessRichText(text, out var resultText);
+            richInfos = ProcessRichText(text, out var resultText);
 
             // We don't care if we the font Texture changes while we are doing our Update.
             // The end result of cachedTextGenerator will be valid for this instance.
@@ -266,6 +281,7 @@ namespace SS.UIComponent
             var iconVerts = new List<UIVertex[]>();
             foreach (var richInfo in richInfos)
             {
+                CalculateRects(richInfo, verts);
                 switch (richInfo.Type)
                 {
                     case RichType.Icon:
@@ -288,11 +304,15 @@ namespace SS.UIComponent
                     case RichType.Underline:
                     {
                         richInfo.Content = UnderlineSpriteName;
+                        // 考虑换行，会是多个矩形
                         var underlineVerts = ApplyUnderlineEffect(richInfo, verts, vertCount);
                         CheckAndCreateWhiteQuad();
-                        iconInfos.Add(richInfo);
-                        icons.TryAdd(richInfo.Content, _whiteQuad);
-                        iconVerts.Add(underlineVerts);
+                        foreach (var uVerts in underlineVerts)
+                        {
+                            iconInfos.Add(richInfo);
+                            icons.TryAdd(richInfo.Content, _whiteQuad);
+                            iconVerts.Add(uVerts);
+                        }
                     }
                         break;
                 }
@@ -367,6 +387,18 @@ namespace SS.UIComponent
             }
 
             m_DisableFontTextureRebuiltCallback = false;
+        }
+
+        public void OnPointerClick(PointerEventData eventData)
+        {
+            Debug.Log($"Click pos: {eventData.position}");
+            RectTransformUtility.ScreenPointToLocalPointInRectangle(rectTransform, eventData.position,
+                eventData.pressEventCamera, out var lp);
+            Debug.Log($"Click pos in local: {lp}");
+            foreach (var richInfo in richInfos)
+            {
+                //
+            }
         }
 
         #endregion
@@ -796,7 +828,7 @@ namespace SS.UIComponent
             return richInfos;
         }
 
-        private List<int> GetWhiteSpaceIndexesInString(string str)
+        private static List<int> GetWhiteSpaceIndexesInString(string str)
         {
             var result = new List<int>();
             for (int i = 0; i < str.Length; i++)
@@ -906,48 +938,58 @@ namespace SS.UIComponent
         /// <summary>
         /// 下划线效果
         /// </summary>
-        private UIVertex[] ApplyUnderlineEffect(RichInfo richInfo, IList<UIVertex> verts, int vertCount)
+        private List<UIVertex[]> ApplyUnderlineEffect(RichInfo richInfo, IList<UIVertex> verts, int vertCount)
         {
-            // 顶点顺序是左上顺时针到左下
-            int start = richInfo.StartIndex * 4;
-            // 要添加下划线的最后一个字符的右下角顶点索引
-            int end = Mathf.Min(richInfo.EndIndex * 4, vertCount) - 2;
             var underlineHeight = 2.0f;
             var padding = 2f;
-            
-            // 下划线的四个顶点
-            UIVertex[] underlineVerts = new UIVertex[4];
-            // 起止坐标
-            float startX = verts[start].position.x;
-            float endX = verts[end].position.x;
-            float endY = verts[end].position.y;
-            // 计算下划线的四个顶点
-            underlineVerts[0] = new UIVertex
-            {
-                position = new Vector3(startX, endY - padding, 0),
-                color = richInfo.Color, // 下划线颜色
-            };
-            underlineVerts[1] = new UIVertex
-            {
-                position = new Vector3(endX, endY - padding, 0),
-                color = richInfo.Color,
-            };
-            underlineVerts[2] = new UIVertex
-            {
-                position = new Vector3(endX, endY - padding - underlineHeight, 0),
-                color = richInfo.Color,
-            };
-            underlineVerts[3] = new UIVertex
-            {
-                position = new Vector3(startX, endY - padding - underlineHeight, 0),
-                color = richInfo.Color,
-            };
 
-            return underlineVerts;
+            var result = new List<UIVertex[]>();
+            var count = richInfo.Rects.Count;
+            for (int i = 0; i < count; i++)
+            {
+                var rectIndex = richInfo.RectIndexes[i];
+                
+                // 顶点顺序是左上顺时针到左下
+                int start = rectIndex[0] * 4;
+                // 要添加下划线的最后一个字符的右下角顶点索引
+                int end = Mathf.Min(rectIndex[1] * 4, vertCount) - 2;
+                
+                // 下划线的四个顶点
+                var underlineVerts = new UIVertex[4];
+                // 起止坐标
+                float startX = verts[start].position.x;
+                float endX = verts[end].position.x;
+                float endY = verts[end].position.y;
+                // 计算下划线的四个顶点
+                underlineVerts[0] = new UIVertex
+                {
+                    position = new Vector3(startX, endY - padding, 0),
+                    color = richInfo.Color, // 下划线颜色
+                };
+                underlineVerts[1] = new UIVertex
+                {
+                    position = new Vector3(endX, endY - padding, 0),
+                    color = richInfo.Color,
+                };
+                underlineVerts[2] = new UIVertex
+                {
+                    position = new Vector3(endX, endY - padding - underlineHeight, 0),
+                    color = richInfo.Color,
+                };
+                underlineVerts[3] = new UIVertex
+                {
+                    position = new Vector3(startX, endY - padding - underlineHeight, 0),
+                    color = richInfo.Color,
+                };
+                
+                result.Add(underlineVerts);
+            }
+
+            return result;
         }
 
         /// <summary>
-        /// 检查并在需要时生成白色2x2纹理
+        /// 检查并在需要时生成白色纹理
         /// </summary>
         private void CheckAndCreateWhiteQuad()
         {
@@ -962,12 +1004,79 @@ namespace SS.UIComponent
                 _whiteQuad = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f));
             }
         }
+
+        private static void CalculateRects(RichInfo richInfo, IList<UIVertex> vertices)
+        {
+            var vertCount = vertices.Count;
+            richInfo.Rects = new List<Vector4>();
+            richInfo.RectIndexes = new List<int[]>();
+            var startIndex = richInfo.StartIndex;
+            var endIndex = richInfo.EndIndex;
+
+            Vector4 rect = -Vector4.one;
+            int[] indexes = new int[2];
+            // 0: 找开始， 1: 找结束
+            var state = 0;
+            // 顶点是从左上的顺时针
+            for (var i = startIndex; i < endIndex; i++)
+            {
+                if (state == 0)
+                {
+                    if (rect.x < 0)
+                    {
+                        var vert = vertices[i * 4 + 3];
+                        rect.x = vert.position.x;
+                        rect.y = vert.position.y;
+                        state = 1;
+                        indexes[0] = i;
+                    }
+                }
+                else
+                {
+                    // 上一个字符的右下
+                    var lastVert = vertices[i * 4 - 2];
+                    // 当前字符的左上
+                    var currentVert = vertices[i * 4];
+                    // 当前字符比前一个字符要早（都是从左往右），就是换行了
+                    if (currentVert.position.x <= lastVert.position.x)
+                    {
+                        if (rect.z < 0)
+                        {
+                            var vert = vertices[i * 4 - 2];
+                            rect.z = vert.position.x;
+                            rect.w = vert.position.y;
+                            state = 0;
+                            indexes[1] = i;
+                            richInfo.Rects.Add(rect);
+                            richInfo.RectIndexes.Add(indexes);
+                            
+                            // 重置一下，继续找下一个
+                            rect = -Vector4.one;
+                            indexes = new int[2];
+                            // 避免换行后的第一个字符没被算入开头，这里计算完上一行的闭口后回退一步
+                            i--;
+                        }
+                    }
+                }
+            }
+            
+            // 说明找到最后没闭上，也就是最后一行没算上
+            if (state == 1)
+            {
+                var vert = vertices[endIndex * 4 - 3];
+                rect.z = vert.position.x;
+                rect.w = vert.position.y;
+                indexes[1] = endIndex;
+                richInfo.Rects.Add(rect);
+                richInfo.RectIndexes.Add(indexes);
+            }
+        }
         
         #endregion
 
         #region Coroutine
 
-        IEnumerator CallIconUpdate(List<RichInfo> iconInfos, Dictionary<string, Sprite> icons, List<UIVertex[]> vertices)
+        private IEnumerator CallIconUpdate(List<RichInfo> iconInfos, Dictionary<string, Sprite> icons, List<UIVertex[]> vertices)
         {
             yield return null;
             iconImage.SetIcons(iconInfos, icons, vertices);
