@@ -5,11 +5,15 @@ using UnityEngine;
 
 namespace SS.UIComponent
 {
+    public interface IIconProvider
+    {
+        Sprite GetIcon(string iconName);
+    }
+    
     /// <summary>
     /// 提供使用的Icon
     /// </summary>
-    [ExecuteInEditMode]
-    public class IconProvider : MonoBehaviour
+    public class IconProvider : IIconProvider
     {
         #region properties
 

@@ -131,18 +131,20 @@ namespace SS.UIComponent
         readonly UIVertex[] m_TempVerts = new UIVertex[4];
         private float spaceWidth;
 
-        private IconProvider _iconProvider;
-        private IconProvider iconProvider
+        private IIconProvider _iconProvider;
+
+        private IIconProvider iconProvider
         {
             get
             {
                 if (_iconProvider == null)
                 {
-                    _iconProvider = GetComponent<IconProvider>();
+                    _iconProvider = new IconProvider();
                 }
-                
+
                 return _iconProvider;
             }
+            set => _iconProvider = value;
         }
         
         private RichTextIconImage _iconImage;
@@ -222,6 +224,13 @@ namespace SS.UIComponent
         
         #region override
 
+        protected override void OnValidate()
+        {
+            base.OnValidate();
+
+            iconProvider = new IconProvider();
+        }
+
         protected override void OnPopulateMesh(VertexHelper toFill)
         {
             if (!supportRichText)
@@ -280,7 +289,7 @@ namespace SS.UIComponent
                     {
                         richInfo.Content = UnderlineSpriteName;
                         var underlineVerts = ApplyUnderlineEffect(richInfo, verts, vertCount);
-                        CheckAndCreateWhite2x2Quad();
+                        CheckAndCreateWhiteQuad();
                         iconInfos.Add(richInfo);
                         icons.TryAdd(richInfo.Content, _whiteQuad);
                         iconVerts.Add(underlineVerts);
@@ -362,6 +371,15 @@ namespace SS.UIComponent
 
         #endregion
 
+        #region Public Methods
+
+        public void SetIconProvider(IIconProvider provider)
+        {
+            iconProvider = provider;
+        }
+
+        #endregion
+        
         #region Private Methods
 
         private List<RichInfo> ProcessRichText(string richText, out string resultText)
@@ -931,7 +949,7 @@ namespace SS.UIComponent
         /// <summary>
         /// 检查并在需要时生成白色2x2纹理
         /// </summary>
-        private void CheckAndCreateWhite2x2Quad()
+        private void CheckAndCreateWhiteQuad()
         {
             if (_whiteQuad == null)
             {
