@@ -38,6 +38,8 @@ namespace SS.UIComponent
             Shadow,
             /// <summary>下划线</summary>
             Underline,
+            /// <summary>link</summary>
+            Link,
         }
         
         private class TagInfo
@@ -81,7 +83,7 @@ namespace SS.UIComponent
         
         #region properties
 
-        public event Action<string> OnClick;
+        public event Action<RichType, string> OnClick;
         
         /// <summary>可以直接使用的颜色单词</summary>
         private static Dictionary<string, Color> Colors = new Dictionary<string, Color>()
@@ -145,6 +147,13 @@ namespace SS.UIComponent
         private const string UnderlineEndRegexText = @"</underline>";
         private readonly Regex UnderlineRegex = new Regex(UnderlineRegexText);
         private readonly Regex UnderlineEndRegex = new Regex(UnderlineEndRegexText);
+        
+        // link（用下划线实现）
+        // private static readonly string LinkRegexText = @"<link=([a-zA-z]+://[^\s]*?)>";
+        private static readonly string LinkRegexText = @"<link=([a-zA-Z][a-zA-Z0-9+\-.]*://[^\s>]+)>";
+        private const string LinkEndRegexText = @"</link>";
+        private readonly Regex LinkRegex = new Regex(LinkRegexText);
+        private readonly Regex LinkEndRegex = new Regex(LinkEndRegexText);
 
         #endregion
 
@@ -308,6 +317,7 @@ namespace SS.UIComponent
                     case RichType.Shadow:
                         ApplyShadowEffect(richInfo, verts, vertCount);
                         break;
+                    // case RichType.Link:
                     case RichType.Underline:
                     {
                         richInfo.Content = UnderlineSpriteName;
@@ -423,16 +433,18 @@ namespace SS.UIComponent
             if (target != null)
             {
                 var message = string.Empty;
-                if (target.Type == RichType.Icon)
+                switch (target.Type)
                 {
-                    message = target.Content;
-                }
-                else
-                {
-                    message = target.EffectedStr;
+                    case RichType.Link:
+                    case RichType.Icon:
+                        message = target.Content;
+                        break;
+                    default:
+                        message = target.EffectedStr;
+                        break;
                 }
 
-                OnClick?.Invoke(message);
+                OnClick?.Invoke(target.Type, message);
             }
         }
 
@@ -738,6 +750,44 @@ namespace SS.UIComponent
                 var tagInfo = new TagInfo()
                 {
                     Type = RichType.Underline,
+                    IsClose = true,
+                    Index = endIndex,
+                    Length = endLength,
+                };
+
+                tags.Add(tagInfo);
+            }
+            
+            // link
+            var linkMatches = LinkRegex.Matches(resultText);
+            var linkEndMatches = LinkEndRegex.Matches(resultText);
+            for (int i = 0; i < linkMatches.Count; i++)
+            {
+                var startMatch = linkMatches[i];
+                var startIndex = startMatch.Index;
+                var startLength = startMatch.Length;
+                var url = startMatch.Groups[1].Value;
+
+                var tagInfo = new TagInfo()
+                {
+                    Type = RichType.Link,
+                    Index = startIndex,
+                    Length = startLength,
+                    Content = url,
+                };
+                
+                tags.Add(tagInfo);
+            }
+            
+            for (int i = 0; i < linkEndMatches.Count; i++)
+            {
+                var endMatch = linkEndMatches[i];
+                var endIndex = endMatch.Index;
+                var endLength = endMatch.Length;
+                
+                var tagInfo = new TagInfo()
+                {
+                    Type = RichType.Link,
                     IsClose = true,
                     Index = endIndex,
                     Length = endLength,
@@ -1086,8 +1136,8 @@ namespace SS.UIComponent
                 {
                     // 上一个字符的右下
                     var lastVert = vertices[i * 4 - 2];
-                    // 当前字符的左上
-                    var currentVert = vertices[i * 4];
+                    // 当前字符的右上
+                    var currentVert = vertices[i * 4 + 1];
                     // 当前字符比前一个字符要早（都是从左往右），就是换行了
                     if (currentVert.position.x <= lastVert.position.x)
                     {
