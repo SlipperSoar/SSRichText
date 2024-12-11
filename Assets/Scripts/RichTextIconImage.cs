@@ -10,12 +10,14 @@ namespace SS.UIComponent
     /// <summary>
     /// 处理富文本的图标内容
     /// </summary>
-    public class RichTextIconImage : Image
+    public class RichTextIconImage : RawImage
     {
         #region properties
 
         private List<RichText.RichInfo> _sprites;
         private List<UIVertex[]> _vertices;
+        private static readonly int Offset = Shader.PropertyToID("_Offset");
+        private static readonly int Scale = Shader.PropertyToID("_Scale");
 
         #endregion
         
@@ -27,14 +29,12 @@ namespace SS.UIComponent
             _vertices = vertices;
             if (_sprites.Count == 1)
             {
-                sprite = icons[_sprites[0].Content];
+                texture = icons[_sprites[0].Content].texture;
             }
             else
             {
-                sprite = CombineSprites(icons);
+                texture = CombineSprites(icons);
             }
-
-            SetVerticesDirty();
         }
 
         #endregion
@@ -73,7 +73,7 @@ namespace SS.UIComponent
 
         #region Private Methods
 
-        private Sprite CombineSprites(Dictionary<string, Sprite> icons)
+        private RenderTexture CombineSprites(Dictionary<string, Sprite> icons)
         {
             // 获取所有图标的尺寸
             var totalWidth = 0;
@@ -86,10 +86,12 @@ namespace SS.UIComponent
                 maxHeight = Mathf.Max(maxHeight, (int)sprite.rect.height);
             }
             
-            // 创建一个新的大纹理来存储所有图标
-            Texture2D combinedTexture = new Texture2D(totalWidth, maxHeight);
-            combinedTexture.filterMode = FilterMode.Bilinear;
-            combinedTexture.wrapMode = TextureWrapMode.Repeat;
+            var renderTexture = RenderTexture.GetTemporary(totalWidth, maxHeight);
+            renderTexture.format = RenderTextureFormat.ARGB32;
+            var prevRT = RenderTexture.active;
+            RenderTexture.active = renderTexture;
+            GL.Clear(true, true, Color.clear);
+            Material blitMaterial = new Material(Shader.Find("Custom/TextureCombine"));
 
             var iconUvs = new Dictionary<string, Vector4>(icons.Count);
             var index = 0;
@@ -104,10 +106,23 @@ namespace SS.UIComponent
                 var uv = new Vector4((spriteRect.x + currentX) / totalWidth, spriteRect.y / maxHeight,
                     (spriteRect.width + currentX) / totalWidth, spriteRect.height / maxHeight);
                 iconUvs.TryAdd(kvp.Key, uv);
+
+                // 计算 UV 偏移和缩放
+                // 偏移和缩放均是指将texture的uv映射到renderTexture上，也就是计算rt（renderTexture）的uv对应的texture的uv值
+                // texture的原始uv是[0, 1]，原封不动（scale = 1）时会铺满rt
+                // 可以把uv的缩放和偏移按照数轴上的区间来理解
+                // scale = rt.wdith / texture.wdith（height同理） 则是将uv缩放到与rt1：1的大小（[0,1]的uv拉伸到[0, scale]）
+                // 此时[0,1]即是rt上从左开始的texture原始比例大小
+                // [0, scale]在偏移(x, y)后，对应的就是[x, sclae + x]，[y, scale + y]
+                // 而texture的采样只能从0到1（[0, 1]），所以当x<0时，texture对应的区间会右移（y同理）
+                // 原本当uv<0或>1时，采样会有repeat、mirror、clamp等模式，使在这之外的区域被填充texture上对应模式下被采样到的像素
+                // 但可以通过丢弃片元的方式放弃对该像素的渲染，即可保留原本的渲染像素
+                Vector2 offset = new Vector2(-currentX / spriteRect.width, 0);
+                Vector2 scale = new Vector2(totalWidth / spriteRect.width, maxHeight / spriteRect.height);
                 
-                // 将图标的像素数据拷贝到大纹理
-                Color[] pixels = texture.GetPixels((int)spriteRect.x, (int)spriteRect.y, (int)spriteRect.width, (int)spriteRect.height);
-                combinedTexture.SetPixels(currentX, 0, (int)spriteRect.width, (int)spriteRect.height, pixels);
+                blitMaterial.SetVector(Offset, offset);
+                blitMaterial.SetVector(Scale, scale);
+                Graphics.Blit(texture, renderTexture, blitMaterial);
 
                 currentX += (int)spriteRect.width; // 更新x坐标
             }
@@ -124,12 +139,8 @@ namespace SS.UIComponent
                 verts[3].uv0 = new Vector2(uv.x, uv.y);
             }
 
-            combinedTexture.Apply();  // 更新纹理
-            
-            // 使用合并后的纹理生成新的 Sprite
-            var newSprite = Sprite.Create(combinedTexture, new Rect(0, 0, combinedTexture.width, combinedTexture.height), new Vector2(0.5f, 0.5f));
-
-            return newSprite;
+            RenderTexture.active = prevRT;
+            return renderTexture;
         }
 
         #endregion
