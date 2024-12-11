@@ -119,7 +119,7 @@ namespace SS.UIComponent
         private readonly Regex BoldRegex = new Regex(BoldRegexText);
         private readonly Regex BoldEndRegex = new Regex(BoldEndRegexText);
         // 颜色
-        private static string ColorRegexText => @"<color=((#[0-9a-f]{6})|(" + GetColorWords() + @"))>";
+        private static string ColorRegexText => @"<color=((#[0-9a-f]{8})|(#[0-9a-f]{6})|(" + GetColorWords() + @"))>";
         private const string ColorEndRegexText = @"</color>";
         private readonly Regex ColorRegex = new Regex(ColorRegexText);
         private readonly Regex ColorEndRegex = new Regex(ColorEndRegexText);
@@ -131,7 +131,7 @@ namespace SS.UIComponent
         
         // 追加的富文本
         // 描边
-        private static readonly string OutlineRegexText = @"<outline=((#[0-9a-f]{6})|(" + GetColorWords() + @"))>";
+        private static readonly string OutlineRegexText = @"<outline=((#[0-9a-f]{8})|(#[0-9a-f]{6})|(" + GetColorWords() + @"))>";
         private const string OutlineEndRegexText = @"</outline>";
         private readonly Regex OutlineRegex = new Regex(OutlineRegexText, RegexOptions.IgnoreCase);
         private readonly Regex OutlineEndRegex = new Regex(OutlineEndRegexText);
@@ -143,7 +143,7 @@ namespace SS.UIComponent
         private readonly Regex ShadowEndRegex = new Regex(ShadowEndRegexText);
         
         // 下划线
-        private static readonly string UnderlineRegexText = @"<underline=((#[0-9a-f]{6})|(" + GetColorWords() + @"))>";
+        private static readonly string UnderlineRegexText = @"<underline=((#[0-9a-f]{8})|(#[0-9a-f]{6})|(" + GetColorWords() + @"))>";
         private const string UnderlineEndRegexText = @"</underline>";
         private readonly Regex UnderlineRegex = new Regex(UnderlineRegexText);
         private readonly Regex UnderlineEndRegex = new Regex(UnderlineEndRegexText);
