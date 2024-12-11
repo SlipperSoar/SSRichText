@@ -91,7 +91,8 @@ namespace SS.UIComponent
             var prevRT = RenderTexture.active;
             RenderTexture.active = renderTexture;
             GL.Clear(true, true, Color.clear);
-            Material blitMaterial = new Material(Shader.Find("Custom/TextureCombine"));
+            // Material blitMaterial = new Material(Shader.Find("Custom/TextureCombineUV"));
+            Material blitMaterial = new Material(Shader.Find("Custom/TextureCombineVert"));
 
             var iconUvs = new Dictionary<string, Vector4>(icons.Count);
             var index = 0;
@@ -117,8 +118,13 @@ namespace SS.UIComponent
                 // 而texture的采样只能从0到1（[0, 1]），所以当x<0时，texture对应的区间会右移（y同理）
                 // 原本当uv<0或>1时，采样会有repeat、mirror、clamp等模式，使在这之外的区域被填充texture上对应模式下被采样到的像素
                 // 但可以通过丢弃片元的方式放弃对该像素的渲染，即可保留原本的渲染像素
-                Vector2 offset = new Vector2(-currentX / spriteRect.width, 0);
-                Vector2 scale = new Vector2(totalWidth / spriteRect.width, maxHeight / spriteRect.height);
+                // Vector2 offset = new Vector2(-currentX / spriteRect.width, 0);
+                // Vector2 scale = new Vector2(totalWidth / spriteRect.width, maxHeight / spriteRect.height);
+                
+                // 计算顶点位置偏移和缩放
+                // offset是从左到右的宽度比例
+                Vector2 offset = new Vector2(currentX / (float)totalWidth, 0);
+                Vector2 scale = new Vector2(spriteRect.width / totalWidth, spriteRect.height / maxHeight);
                 
                 blitMaterial.SetVector(Offset, offset);
                 blitMaterial.SetVector(Scale, scale);

@@ -1,4 +1,4 @@
-Shader "Custom/TextureCombine"
+Shader "Custom/TextureCombineUV"
 {
     Properties
     {
@@ -64,11 +64,11 @@ Shader "Custom/TextureCombine"
 
             fixed4 frag (v2f i) : SV_Target
             {
-                // sample the texture
-                fixed4 col = tex2D(_MainTex, i.texcoord);
                 // 舍弃 <0 和 >1
                 clip(i.texcoord);
                 clip(1 - i.texcoord);
+                // sample the texture
+                fixed4 col = tex2D(_MainTex, i.texcoord);
                 return col;
             }
             ENDCG
