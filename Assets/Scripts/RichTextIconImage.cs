@@ -1,7 +1,7 @@
 /*
  * @author SlipperSoar
  * @Created: 2024-12-08
- * @description Unity 富文本扩展用的RawImage扩展
+ * @description Unity Text富文本扩展用的RawImage扩展
  */
 
 using System.Collections.Generic;

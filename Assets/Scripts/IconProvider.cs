@@ -1,6 +1,9 @@
-using System;
-using System.Collections;
-using System.Collections.Generic;
+/*
+ * @author SlipperSoar
+ * @Created: 2024-12-08
+ * @description Unity Text 富文本扩展的图标用的provider
+ */
+
 using UnityEngine;
 
 namespace SS.UIComponent
