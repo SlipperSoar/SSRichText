@@ -1,7 +1,12 @@
+/*
+ * @author SlipperSoar
+ * @Created: 2024-12-07
+ * @description Unity Text富文本扩展
+ */
+
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using UnityEditor;
@@ -395,13 +400,8 @@ namespace SS.UIComponent
                 }
             }
 
-            // 处理图标
-            iconImage.gameObject.SetActive(iconInfos.Count > 0);
-            if (iconInfos.Count > 0)
-            {
-                // 避免同时更新渲染
-                StartCoroutine(CallIconUpdate(iconInfos, icons, iconVerts));
-            }
+            // 避免同时更新渲染
+            StartCoroutine(CallIconUpdate(iconInfos, icons, iconVerts));
 
             m_DisableFontTextureRebuiltCallback = false;
         }
@@ -1180,7 +1180,13 @@ namespace SS.UIComponent
         private IEnumerator CallIconUpdate(List<RichInfo> iconInfos, Dictionary<string, Sprite> icons, List<UIVertex[]> vertices)
         {
             yield return null;
-            iconImage.SetIcons(iconInfos, icons, vertices);
+            // 处理图标
+            var needShowIcons = iconInfos.Count > 0;
+            iconImage.gameObject.SetActive(needShowIcons);
+            if (needShowIcons)
+            {
+                iconImage.SetIcons(iconInfos, icons, vertices);
+            }
         }
 
         #endregion

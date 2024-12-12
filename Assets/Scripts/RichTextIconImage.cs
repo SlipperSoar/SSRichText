@@ -1,8 +1,11 @@
-using System.Collections;
+/*
+ * @author SlipperSoar
+ * @Created: 2024-12-08
+ * @description Unity 富文本扩展用的RawImage扩展
+ */
+
 using System.Collections.Generic;
-using System.Linq;
 using UnityEngine;
-using UnityEngine.Sprites;
 using UnityEngine.UI;
 
 namespace SS.UIComponent
