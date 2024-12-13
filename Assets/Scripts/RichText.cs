@@ -7,6 +7,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using UnityEditor;
@@ -25,6 +26,7 @@ namespace SS.UIComponent
     {
         #region inner enum/struct
 
+        // 顺序也有排序的用途，主要用于点击时响应的优先级
         public enum RichType
         {
             /// <summary>斜体</summary>
@@ -35,8 +37,6 @@ namespace SS.UIComponent
             Color,
             /// <summary>字体大小</summary>
             Size,
-            /// <summary>图标</summary>
-            Icon,
             /// <summary>描边</summary>
             Outline,
             /// <summary>阴影</summary>
@@ -45,6 +45,8 @@ namespace SS.UIComponent
             Underline,
             /// <summary>link</summary>
             Link,
+            /// <summary>图标</summary>
+            Icon,
         }
         
         private class TagInfo
@@ -411,7 +413,7 @@ namespace SS.UIComponent
             RectTransformUtility.ScreenPointToLocalPointInRectangle(rectTransform, eventData.position,
                 eventData.pressEventCamera, out var lp);
             
-            RichInfo target = null;
+            var targets = new List<RichInfo>();
             foreach (var richInfo in richInfos)
             {
                 var rects = richInfo.Rects;
@@ -419,20 +421,16 @@ namespace SS.UIComponent
                 {
                     if (rect.x <= lp.x && rect.z >= lp.x && rect.y <= lp.y && rect.w >= lp.y)
                     {
-                        target = richInfo;
+                        targets.Add(richInfo);
                         break;
                     }
                 }
-
-                if (target != null)
-                {
-                    break;
-                }
             }
 
-            if (target != null)
+            if (targets.Count > 0)
             {
-                var message = string.Empty;
+                var target = targets.OrderByDescending(t => t.Type).First();
+                string message;
                 switch (target.Type)
                 {
                     case RichType.Link:
@@ -805,7 +803,7 @@ namespace SS.UIComponent
             var richInfoStack = new Stack<RichInfo>(tagCount);
             var offset = 0;
             // 子字符串的起止
-            var subStrPairs = new List<(int start, int length)>();
+            var subStrPairs = new List<(int start, int length, bool isRaw)>();
             for (int i = 0; i < tagCount; i++)
             {
                 var tag = tags[i];
@@ -863,10 +861,12 @@ namespace SS.UIComponent
                         case RichType.Color:
                         case RichType.Italic:
                         case RichType.Size:
+                            subStrPairs.Add((top.Index, top.Length, true));
+                            subStrPairs.Add((tag.Index, tag.Length, true));
                             break;
                         default:
-                            subStrPairs.Add((top.Index, top.Length));
-                            subStrPairs.Add((tag.Index, tag.Length));
+                            subStrPairs.Add((top.Index, top.Length, false));
+                            subStrPairs.Add((tag.Index, tag.Length, false));
                             break;
                     }
                 }
@@ -887,44 +887,47 @@ namespace SS.UIComponent
             }
 
             // 最后统一替换
+            // 为了得到准确的字符串，temp要去掉所有的富文本标签了
+            var tempText = string.Empty;
             if (subStrPairs.Count > 0)
             {
                 // 从前往后顺序排序
                 subStrPairs.Sort((a, b) => a.start - b.start);
                 var resultStrBuilder = new StringBuilder();
+                var tempStrBuilder = new StringBuilder();
                 var index = 0;
+                var tempIndex = 0;
                 for (var i = 0; i < subStrPairs.Count; i++)
                 {
                     var strPair = subStrPairs[i];
-                    resultStrBuilder.Append(resultText[index..strPair.start]);
-                    index = strPair.start + strPair.length;
+                    if (!strPair.isRaw)
+                    {
+                        resultStrBuilder.Append(resultText.GetSubString(index, strPair.start));
+                        index = strPair.start + strPair.length;
+                    }
+                    
+                    tempStrBuilder.Append(resultText.GetSubString(tempIndex, strPair.start));
+                    tempIndex = strPair.start + strPair.length;
                 }
                 
                 // 加上最后的字符串
-                resultStrBuilder.Append(resultText[index..]);
+                resultStrBuilder.Append(resultText.GetSubString(index));
 
                 resultText = resultStrBuilder.ToString();
+                tempText = tempStrBuilder.ToString();
             }
 
             // 占位字符，到时候要将alpha设置为0
             // 可以保证有嵌套size的情况下可以生成正确的顶点
             resultText = IconRegex.Replace(resultText, "〇");
-            
-            // 为了得到准确的字符串，这里要去掉所有的富文本标签了
-            var tempText = BoldRegex.Replace(resultText, "");
-            tempText = BoldEndRegex.Replace(tempText, "");
-            tempText = ItalicRegex.Replace(tempText, "");
-            tempText = ItalicEndRegex.Replace(tempText, "");
-            tempText = ColorRegex.Replace(tempText, "");
-            tempText = ColorEndRegex.Replace(tempText, "");
-            tempText = SizeRegex.Replace(tempText, "");
-            tempText = SizeEndRegex.Replace(tempText, "");
-            // 然后去掉white space
+
+            // temp去掉white space
+            tempText = IconRegex.Replace(tempText, "〇");
             tempText = WhiteSpaceRegex.Replace(tempText, "");
 
             foreach (var richInfo in richInfos)
             {
-                richInfo.EffectedStr = tempText[richInfo.StartIndex..richInfo.EndIndex];
+                richInfo.EffectedStr = tempText.GetSubString(richInfo.StartIndex, richInfo.EndIndex);
             }
 
             return richInfos;

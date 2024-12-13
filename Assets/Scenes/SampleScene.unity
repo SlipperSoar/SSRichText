@@ -429,8 +429,8 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\u4F60\u8BF4<size=40>\u7684</size>\u662F\u8C01<b>1a</b><i>sd<size=40>4</size>icon</i>-><icon=Test1/><-<outline=blue>2<outline>12</outline><size=32>a<b><i><outline=red>A</outline></i></b></size>111111\n<shadow>Shadow!</shadow><icon=Test2/><icon=Test3/><icon=Test2/><underline=red>11111111111111111111111p11111
-    11111</underline><icon=Test2/><icon=Test4/><icon=Test3/><icon=Test4/>\n<underline=green><link=https://www.baidu.com>\u767E\u5EA6</link></underline>"
+  m_Text: "\u4F60\u8BF4<size=40>\u7684\u662F\u8C01</size><i>icon</i>-><icon=Test1/><-<outline=blue>2<outline>12</outline><size=32>a</size>111111\n<shadow>Shadow!</shadow><icon=Test2/><icon=Test3/><icon=Test2/><underline=red>11111111111111111111111p11111
+    11111</underline><icon=Test2/><icon=Test4/><icon=Test3/><size=40><icon=Test4/></size>\n<underline=green><link=https://www.baidu.com>\u767E\u5EA6</link></underline>"
 --- !u!222 &741103083
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -578,7 +578,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: New<size=40> </size>Text<color=#1122ffff>Color</color>
+  m_Text: New<size=40>A</size>Text<color=#1122ffff>Color</color>
 --- !u!222 &1343013881
 CanvasRenderer:
   m_ObjectHideFlags: 0

@@ -49,5 +49,37 @@ namespace SS.UIComponent
             }
 #endif
         }
+
+        /// <summary>
+        /// 子字符串获取
+        /// </summary>
+        /// <param name="str"></param>
+        /// <param name="startIndex"></param>
+        /// <param name="endIndex"></param>
+        /// <returns></returns>
+        public static string GetSubString(this string str, int startIndex, int endIndex)
+        {
+#if UNITY_2021_2_OR_NEWER
+            return str[startIndex..endIndex];
+#else
+            return str.Substring(startIndex, endIndex - startIndex);
+#endif
+        }
+        
+        /// <summary>
+        /// 子字符串获取
+        /// </summary>
+        /// <param name="str"></param>
+        /// <param name="startIndex"></param>
+        /// <param name="endIndex"></param>
+        /// <returns></returns>
+        public static string GetSubString(this string str, int startIndex)
+        {
+#if UNITY_2021_2_OR_NEWER
+            return str[startIndex..];
+#else
+            return str.Substring(startIndex);
+#endif
+        }
     }
 }
