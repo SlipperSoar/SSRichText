@@ -918,7 +918,7 @@ namespace SS.UIComponent
             }
 
             // 占位字符，到时候要将alpha设置为0
-            var replaceChar = "\u25a0";//〇, ■
+            var replaceChar = "\u25a0";//〇
             // 可以保证有嵌套size的情况下可以生成正确的顶点
             resultText = IconRegex.Replace(resultText, replaceChar);
 
@@ -1024,11 +1024,21 @@ namespace SS.UIComponent
             var start = richInfo.StartIndex * 4;
             var end = start + 4;
             var iconVerts = new UIVertex[4];
+            // 图标一定是单个字符，这里把uv收缩50%应该会很合适
+            // index + 2 一定是对角
+            var vert1 = verts[start];
+            var vert2 = verts[start + 2];
+            var uvCenterX = (vert1.uv0.x + vert2.uv0.x) / 2;
+            var uvCenterY = (vert1.uv0.y + vert2.uv0.y) / 2;
             for (int i = start; i < end; i++)
             {
                 // 将原字符设置为透明
                 var vert = verts[i];
                 vert.color.a = 0;
+                var uv = vert.uv0;
+                uv.x = (uv.x + uvCenterX) / 2;
+                uv.y = (uv.y + uvCenterY) / 2;
+                vert.uv0 = uv;
                 verts[i] = vert;
 
                 // 整理图标
