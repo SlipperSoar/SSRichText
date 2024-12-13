@@ -215,6 +215,7 @@ namespace SS.UIComponent
 
         private Sprite _whiteQuad;
         private const string UnderlineSpriteName = "<underline>";
+        private Vector4[] underlineUVs;
 
         private List<RichInfo> richInfos;
 
@@ -280,6 +281,8 @@ namespace SS.UIComponent
             if (font == null)
                 return;
             
+            // 先把下划线用的uv清掉
+            underlineUVs = null;
             // 文本处理
             richInfos = ProcessRichText(text, out var resultText);
 
@@ -302,6 +305,8 @@ namespace SS.UIComponent
             var iconInfos = new List<RichInfo>();
             var icons = new Dictionary<string, Sprite>();
             var iconVerts = new List<UIVertex[]>();
+            // 下划线暂存
+            var underlineInfos = new List<RichInfo>();
             foreach (var richInfo in richInfos)
             {
                 CalculateRects(richInfo, verts);
@@ -327,18 +332,46 @@ namespace SS.UIComponent
                     // case RichType.Link:
                     case RichType.Underline:
                     {
-                        richInfo.Content = UnderlineSpriteName;
-                        // 考虑换行，会是多个矩形
-                        var underlineVerts = ApplyUnderlineEffect(richInfo, verts, vertCount);
-                        CheckAndCreateWhiteQuad();
-                        foreach (var uVerts in underlineVerts)
-                        {
-                            iconInfos.Add(richInfo);
-                            icons.TryAddToDictionary(richInfo.Content, _whiteQuad);
-                            iconVerts.Add(uVerts);
-                        }
+                        underlineInfos.Add(richInfo);
                     }
                         break;
+                }
+            }
+
+            // 尝试渲染下划线
+            // 当存在图标时，可以通过图标的占位字符拿到铺满颜色的uv区域
+            // 当不存在图标时，没有占位字符可以用，就用图标的渲染方式来渲染下划线
+            if (underlineUVs == null)
+            {
+                foreach (var richInfo in underlineInfos)
+                {
+                    richInfo.Content = UnderlineSpriteName;
+                    // 考虑换行，会是多个矩形
+                    var underlineVerts = ApplyUnderlineEffect(richInfo, verts, vertCount);
+                    CheckAndCreateWhiteQuad();
+                    foreach (var uVerts in underlineVerts)
+                    {
+                        iconInfos.Add(richInfo);
+                        icons.TryAddToDictionary(richInfo.Content, _whiteQuad);
+                        iconVerts.Add(uVerts);
+                    }
+                }
+            }
+            else
+            {
+                foreach (var richInfo in underlineInfos)
+                {
+                    // 考虑换行，会是多个矩形
+                    var underlineVerts = ApplyUnderlineEffect(richInfo, verts, vertCount);
+                    foreach (var uVerts in underlineVerts)
+                    {
+                        for (int i = 0; i < uVerts.Length; i++)
+                        {
+                            var vert = uVerts[i];
+                            vert.uv0 = underlineUVs[i];
+                            verts.Add(vert);
+                        }
+                    }
                 }
             }
             
@@ -811,10 +844,18 @@ namespace SS.UIComponent
                 if (spaceIndexes.Count > 0)
                 {
                     var spaceIndex = spaceIndexes.Peek();
-                    if (tag.Index > spaceIndex)
+                    while (tag.Index > spaceIndex)
                     {
-                        offset++;
                         spaceIndexes.Dequeue();
+                        offset++;
+                        if (spaceIndexes.Count > 0)
+                        {
+                            spaceIndex = spaceIndexes.Peek();
+                        }
+                        else
+                        {
+                            break;
+                        }
                     }
                 }
                 if (tag.IsClose)
@@ -1020,6 +1061,11 @@ namespace SS.UIComponent
             {
                 iconSprite = iconProvider.GetIcon(iconName);
             }
+
+            if (underlineUVs == null)
+            {
+                underlineUVs = new Vector4[4];
+            }
             
             var start = richInfo.StartIndex * 4;
             var end = start + 4;
@@ -1040,6 +1086,7 @@ namespace SS.UIComponent
                 uv.y = (uv.y + uvCenterY) / 2;
                 vert.uv0 = uv;
                 verts[i] = vert;
+                underlineUVs[i - start] = uv;
 
                 // 整理图标
                 var iconVert = vert;
