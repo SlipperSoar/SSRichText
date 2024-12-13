@@ -429,8 +429,8 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\u4F60\u8BF4<size=40>\u7684\u662F\u8C01</size><i>icon</i>-><icon=Test1/><-<outline=blue>2<outline>12</outline><size=32>a</size>111111\n<shadow>Shadow!</shadow><icon=Test2/><icon=Test3/><icon=Test2/><underline=red>11111111111111111111111p11111
-    11111</underline><icon=Test2/><icon=Test4/><icon=Test3/><size=40><icon=Test4/></size>\n<underline=green><link=https://www.baidu.com>\u767E\u5EA6</link></underline>"
+  m_Text: "Unity<size=40><color=yellow>\u539F\u751F\u7684</color>\u6807\u7B7E</size><b>Bold</b>+<i>Italic</i>\n<i>icon</i>-><icon=Test1/><-<outline=blue>outline<outline>!</outline>111111\n<shadow>Shadow!</shadow><icon=Test2/><icon=Test3/><icon=Test2/><underline=red>11111111111111111111111p11111
+    11111</underline><icon=Test2/><icon=Test4/><icon=Test3/>\u5927icon<size=40><shadow><icon=Test4/></shadow></size>\n\u8FD8\u6709\u94FE\u63A5\u53EF\u4EE5\u70B9\uFF1A<underline=green><link=https://www.baidu.com>\u767E\u5EA6</link></underline>"
 --- !u!222 &741103083
 CanvasRenderer:
   m_ObjectHideFlags: 0

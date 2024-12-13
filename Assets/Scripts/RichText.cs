@@ -918,11 +918,12 @@ namespace SS.UIComponent
             }
 
             // 占位字符，到时候要将alpha设置为0
+            var replaceChar = "\u25a0";//〇, ■
             // 可以保证有嵌套size的情况下可以生成正确的顶点
-            resultText = IconRegex.Replace(resultText, "〇");
+            resultText = IconRegex.Replace(resultText, replaceChar);
 
             // temp去掉white space
-            tempText = IconRegex.Replace(tempText, "〇");
+            tempText = IconRegex.Replace(tempText, replaceChar);
             tempText = WhiteSpaceRegex.Replace(tempText, "");
 
             foreach (var richInfo in richInfos)
@@ -968,6 +969,11 @@ namespace SS.UIComponent
                 v.x += -1;
                 v.y += 1;
                 vt.position = v;
+                // 先把本身透明的给改成不透明
+                if (vt.color.a == 0)
+                {
+                    vt.color.a = 255;
+                }
                 vt.color.a = (byte)(vt.color.a / 2);
                 verts[i] = vt;
             }
