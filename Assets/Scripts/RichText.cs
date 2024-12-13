@@ -311,7 +311,7 @@ namespace SS.UIComponent
                         if (icon.icon != null)
                         {
                             iconInfos.Add(richInfo);
-                            icons.TryAdd(richInfo.Content, icon.icon);
+                            icons.TryAddToDictionary(richInfo.Content, icon.icon);
                             iconVerts.Add(icon.verts);
                         }
                     }
@@ -332,7 +332,7 @@ namespace SS.UIComponent
                         foreach (var uVerts in underlineVerts)
                         {
                             iconInfos.Add(richInfo);
-                            icons.TryAdd(richInfo.Content, _whiteQuad);
+                            icons.TryAddToDictionary(richInfo.Content, _whiteQuad);
                             iconVerts.Add(uVerts);
                         }
                     }
@@ -1100,7 +1100,7 @@ namespace SS.UIComponent
                 var size = 8;
                 Texture2D tex = new Texture2D(size, size);
                 Color[] colors = new Color[size * size];
-                Array.Fill(colors, Color.white);
+                colors.FillArray(Color.white);
                 tex.SetPixels(colors);
                 tex.Apply();
                 _whiteQuad = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f));

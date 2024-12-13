@@ -109,7 +109,7 @@ namespace SS.UIComponent
                 // 计算图标的UV坐标
                 var uv = new Vector4((spriteRect.x + currentX) / totalWidth, spriteRect.y / maxHeight,
                     (spriteRect.width + currentX) / totalWidth, spriteRect.height / maxHeight);
-                iconUvs.TryAdd(kvp.Key, uv);
+                iconUvs.TryAddToDictionary(kvp.Key, uv);
 
                 // 计算 UV 偏移和缩放
                 // 偏移和缩放均是指将texture的uv映射到renderTexture上，也就是计算rt（renderTexture）的uv对应的texture的uv值
