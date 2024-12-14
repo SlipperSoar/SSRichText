@@ -215,7 +215,7 @@ namespace SS.UIComponent
             }
         }
 
-        private Sprite _whiteQuad;
+        private static Sprite _whiteQuad;
         private const string UnderlineSpriteName = "<underline>";
         private Vector4[] underlineUVs;
 
