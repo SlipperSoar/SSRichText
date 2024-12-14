@@ -305,6 +305,9 @@ namespace SS.UIComponent
             var iconInfos = new List<RichInfo>();
             var icons = new Dictionary<string, Sprite>();
             var iconVerts = new List<UIVertex[]>();
+            
+            // 图标阴影。这个每个元素只用一次就remove，用LinkedList可以避免数组整体移动，也用不着哈希计算
+            var iconShadows = new LinkedList<int>();
             // 下划线暂存
             var underlineInfos = new List<RichInfo>();
             foreach (var richInfo in richInfos)
@@ -327,7 +330,7 @@ namespace SS.UIComponent
                         ApplyOutlineEffect(richInfo, verts, vertCount);
                         break;
                     case RichType.Shadow:
-                        ApplyShadowEffect(richInfo, verts, vertCount);
+                        ApplyShadowEffect(richInfo, verts, vertCount, iconShadows);
                         break;
                     case RichType.Underline:
                     {
@@ -437,7 +440,7 @@ namespace SS.UIComponent
             // 计算完把下划线用的uv清掉
             underlineUVs = null;
             // 避免同时更新渲染
-            StartCoroutine(CallIconUpdate(iconInfos, icons, iconVerts));
+            StartCoroutine(CallIconUpdate(iconInfos, icons, iconVerts, iconShadows));
 
             m_DisableFontTextureRebuiltCallback = false;
         }
@@ -747,26 +750,49 @@ namespace SS.UIComponent
         /// <summary>
         /// 投影效果
         /// </summary>
-        private void ApplyShadowEffect(RichInfo richInfo, IList<UIVertex> verts, int vertCount)
+        /// <param name="iconIndexList">需要应用阴影的Icon（占位）字符的索引列表</param>
+        private void ApplyShadowEffect(RichInfo richInfo, IList<UIVertex> verts, int vertCount, LinkedList<int> iconIndexList)
         {
-            int start = richInfo.StartIndex * 4;
-            int end = Mathf.Min(richInfo.EndIndex * 4, vertCount);
-            UIVertex vt;
-            for(int i = start; i < end; i++)
+            // 计算图标阴影所处的索引
+            var iconIndexes = new Queue<int>();
+            for (var i = 0; i < richInfo.EffectedStr.Length; i++)
             {
-                vt = verts[i];
-                verts.Add(vt);
-                Vector3 v = vt.position;
-                v.x += -1;
-                v.y += 1;
-                vt.position = v;
-                // 先把本身透明的给改成不透明
-                if (vt.color.a == 0)
+                var @char = richInfo.EffectedStr[i];
+                if (@char == IconReplaceChar[0])
                 {
-                    vt.color.a = 255;
+                    iconIndexes.Enqueue(i + richInfo.StartIndex);
                 }
-                vt.color.a = (byte)(vt.color.a / 2);
-                verts[i] = vt;
+            }
+
+            for (var i = richInfo.StartIndex; i < richInfo.EndIndex; i++)
+            {
+                // 跳过图标阴影
+                if (iconIndexes.Count != 0 && i == iconIndexes.Peek())
+                {
+                    iconIndexList.AddLast(iconIndexes.Dequeue());
+                    continue;
+                }
+
+                var start = i * 4;
+                var end = start + 4;
+                UIVertex vt;
+                for (var j = start; j < end; j++)
+                {
+                    vt = verts[j];
+                    verts.Add(vt);
+                    Vector3 v = vt.position;
+                    v.x += -1;
+                    v.y += 1;
+                    vt.position = v;
+                    // 先把本身透明的给改成不透明
+                    // 这是为图标准备的，但图标不在这里计算阴影了
+                    // if (vt.color.a == 0)
+                    // {
+                    //     vt.color.a = 255;
+                    // }
+                    vt.color.a = (byte)(vt.color.a / 2);
+                    verts[j] = vt;
+                }
             }
         }
 
@@ -993,7 +1019,7 @@ namespace SS.UIComponent
 
         #region Coroutine
 
-        private IEnumerator CallIconUpdate(List<RichInfo> iconInfos, Dictionary<string, Sprite> icons, List<UIVertex[]> vertices)
+        private IEnumerator CallIconUpdate(List<RichInfo> iconInfos, Dictionary<string, Sprite> icons, List<UIVertex[]> vertices, LinkedList<int> iconShadows)
         {
             yield return null;
             // 处理图标
@@ -1001,7 +1027,7 @@ namespace SS.UIComponent
             iconImage.gameObject.SetActive(needShowIcons);
             if (needShowIcons)
             {
-                iconImage.SetIcons(iconInfos, icons, vertices);
+                iconImage.SetIcons(iconInfos, icons, vertices, iconShadows);
             }
         }
 

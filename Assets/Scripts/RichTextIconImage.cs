@@ -19,6 +19,7 @@ namespace SS.UIComponent
 
         private List<RichText.RichInfo> _sprites;
         private List<UIVertex[]> _vertices;
+        private LinkedList<int> _iconShadows;
         private static readonly int Offset = Shader.PropertyToID("_Offset");
         private static readonly int Scale = Shader.PropertyToID("_Scale");
 
@@ -26,10 +27,11 @@ namespace SS.UIComponent
         
         #region Public Methods
 
-        public void SetIcons(List<RichText.RichInfo> iconInfos, Dictionary<string, Sprite> icons, List<UIVertex[]> vertices)
+        public void SetIcons(List<RichText.RichInfo> iconInfos, Dictionary<string, Sprite> icons, List<UIVertex[]> vertices, LinkedList<int> iconShadows)
         {
             _sprites = iconInfos;
             _vertices = vertices;
+            _iconShadows = iconShadows;
             if (_sprites.Count == 1)
             {
                 texture = icons[_sprites[0].Content].texture;
@@ -61,16 +63,15 @@ namespace SS.UIComponent
                 verts[1].color = color * info.Color;
                 verts[2].color = color * info.Color;
                 verts[3].color = color * info.Color;
-                
-                toFill.AddVert(verts[0]);
-                toFill.AddVert(verts[1]);
-                toFill.AddVert(verts[2]);
-                toFill.AddVert(verts[3]);
 
-                var vertCount = toFill.currentVertCount;
-                // 添加图标的四个顶点所组成的矩形
-                toFill.AddTriangle(vertCount - 4, vertCount - 3, vertCount - 2);
-                toFill.AddTriangle(vertCount - 4, vertCount - 2, vertCount - 1);
+                if (_iconShadows.Remove(info.StartIndex))
+                {
+                    ApplyIconShadow(verts, toFill);
+                }
+                else
+                {
+                    AddIconTriangle(verts, toFill);
+                }
             }
         }
 
@@ -152,6 +153,42 @@ namespace SS.UIComponent
             return renderTexture;
         }
 
+        private void ApplyIconShadow(UIVertex[] verts, VertexHelper toFill)
+        {
+            UIVertex vt;
+            UIVertex[] shadowVerts = new UIVertex[4];
+            for (int i = 0; i < 4; i++)
+            {
+                vt = verts[i];
+                Vector3 v = vt.position;
+                v.x += -1;
+                v.y += 1;
+                vt.position = v;
+                var alpha = vt.color.a;
+                vt.color = Color.black;
+                vt.color.a = (byte)(alpha / 2);
+                
+                shadowVerts[i] = vt;
+            }
+            
+            // 先加阴影再加图标本身
+            AddIconTriangle(shadowVerts, toFill);
+            AddIconTriangle(verts, toFill);
+        }
+
+        private void AddIconTriangle(UIVertex[] verts, VertexHelper toFill)
+        {
+            toFill.AddVert(verts[0]);
+            toFill.AddVert(verts[1]);
+            toFill.AddVert(verts[2]);
+            toFill.AddVert(verts[3]);
+
+            var vertCount = toFill.currentVertCount;
+            // 添加图标的四个顶点所组成的矩形
+            toFill.AddTriangle(vertCount - 4, vertCount - 3, vertCount - 2);
+            toFill.AddTriangle(vertCount - 4, vertCount - 2, vertCount - 1);
+        }
+        
         #endregion
     }
 }

@@ -3,7 +3,9 @@
 
 实现思路来自：[ZUIRichText](https://github.com/172672672/UGUI-RichText)
 
-使用的图标来自：[阿里图标库大头贴](https://www.iconfont.cn/collections/detail?spm=a313x.collections_index.i1.d9df05512.168b3a81l8GbZU&cid=50743)
+使用的图标来自：
+[阿里图标库大头贴](https://www.iconfont.cn/collections/detail?spm=a313x.collections_index.i1.d9df05512.168b3a81l8GbZU&cid=50743)
+[阿里图标库多彩小植物](https://www.iconfont.cn/collections/detail?spm=a313x.collections_index.i1.d9df05512.675d3a81CPSoFN&cid=50664)
 
 支持的富文本标签：
 
@@ -27,3 +29,6 @@
 |    \<icon=xxxx/>    | OnClick | type, iconName |                        -                        |
 |         默认          | OnClick |   type, 文本内容   | 包含outline、underline、shadow以及原生支持的color、size、b、i |
 
+# 效果图
+
+![效果](DocImages/PixPin_2024-12-14_16-20-52.png)
