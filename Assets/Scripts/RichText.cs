@@ -164,6 +164,8 @@ namespace SS.UIComponent
 
         #endregion
 
+        // 占位字符，到时候要将alpha设置为0
+        const string IconReplaceChar = "\u25a0";//■
         readonly UIVertex[] m_TempVerts = new UIVertex[4];
         private float spaceWidth;
 
@@ -327,7 +329,6 @@ namespace SS.UIComponent
                     case RichType.Shadow:
                         ApplyShadowEffect(richInfo, verts, vertCount);
                         break;
-                    // case RichType.Link:
                     case RichType.Underline:
                     {
                         underlineInfos.Add(richInfo);
@@ -683,13 +684,11 @@ namespace SS.UIComponent
                 tempText = tempStrBuilder.ToString();
             }
 
-            // 占位字符，到时候要将alpha设置为0
-            var replaceChar = "\u25a0";//〇
             // 可以保证有嵌套size的情况下可以生成正确的顶点
-            resultText = IconRegex.Replace(resultText, replaceChar);
+            resultText = IconRegex.Replace(resultText, IconReplaceChar);
 
             // temp去掉white space
-            tempText = IconRegex.Replace(tempText, replaceChar);
+            tempText = IconRegex.Replace(tempText, IconReplaceChar);
             tempText = WhiteSpaceRegex.Replace(tempText, "");
 
             foreach (var richInfo in richInfos)
