@@ -284,7 +284,7 @@ namespace SS.UIComponent
                 return;
 
             // 文本处理
-            richInfos = ProcessRichText(text, out var resultText);
+            richInfos = ProcessRichText(text, out var resultText, out var textWithoutTag);
 
             // We don't care if we the font Texture changes while we are doing our Update.
             // The end result of cachedTextGenerator will be valid for this instance.
@@ -310,14 +310,17 @@ namespace SS.UIComponent
             var iconShadows = new LinkedList<int>();
             // 下划线暂存
             var underlineInfos = new List<RichInfo>();
+            // 获取最后一个可显示出来的字符顶点，以免超出显示区域后显示错乱
+            verts = ProcessRawTags(verts, resultText, textWithoutTag);
+            vertCount = verts.Count;
             foreach (var richInfo in richInfos)
             {
-                CalculateRects(richInfo, verts);
+                CalculateRects(richInfo, verts, vertCount);
                 switch (richInfo.Type)
                 {
                     case RichType.Icon:
                     {
-                        var icon = ApplyIcon(richInfo, verts, icons);
+                        var icon = ApplyIcon(richInfo, verts, icons, vertCount);
                         if (icon.icon != null)
                         {
                             iconInfos.Add(richInfo);
@@ -496,7 +499,7 @@ namespace SS.UIComponent
         
         #region Private Methods
 
-        private List<RichInfo> ProcessRichText(string richText, out string resultText)
+        private List<RichInfo> ProcessRichText(string richText, out string resultText, out string textWithoutTag)
         {
             // 通过将富文本内容提取成仅包含size和color的文本来使用Text的生成器生成顶点信息
             resultText = richText;
@@ -657,8 +660,8 @@ namespace SS.UIComponent
             }
 
             // 最后统一替换
-            // 为了得到准确的字符串，temp要去掉所有的富文本标签了
-            var tempText = string.Empty;
+            // 为了得到准确的字符串，要有一个去掉所有的富文本标签的文本
+            textWithoutTag = string.Empty;
             if (subStrPairs.Count > 0)
             {
                 // 从前往后顺序排序
@@ -684,19 +687,19 @@ namespace SS.UIComponent
                 resultStrBuilder.Append(resultText.GetSubString(index));
 
                 resultText = resultStrBuilder.ToString();
-                tempText = tempStrBuilder.ToString();
+                textWithoutTag = tempStrBuilder.ToString();
             }
 
             // 可以保证有嵌套size的情况下可以生成正确的顶点
             resultText = IconRegex.Replace(resultText, IconReplaceChar);
 
             // temp去掉white space
-            tempText = IconRegex.Replace(tempText, IconReplaceChar);
-            tempText = WhiteSpaceRegex.Replace(tempText, "");
+            textWithoutTag = IconRegex.Replace(textWithoutTag, IconReplaceChar);
+            textWithoutTag = WhiteSpaceRegex.Replace(textWithoutTag, "");
 
             foreach (var richInfo in richInfos)
             {
-                richInfo.EffectedStr = tempText.GetSubString(richInfo.StartIndex, richInfo.EndIndex);
+                richInfo.EffectedStr = textWithoutTag.GetSubString(richInfo.StartIndex, richInfo.EndIndex);
             }
 
             return richInfos;
@@ -753,6 +756,12 @@ namespace SS.UIComponent
         /// <param name="iconIndexList">需要应用阴影的Icon（占位）字符的索引列表</param>
         private void ApplyShadowEffect(RichInfo richInfo, IList<UIVertex> verts, int vertCount, LinkedList<int> iconIndexList)
         {
+            // 先检查能不能被渲染出来，不能那就算了
+            if (richInfo.StartIndex * 4 >= vertCount)
+            {
+                return;
+            }
+            
             // 计算图标阴影所处的索引
             var iconIndexes = new Queue<int>();
             for (var i = 0; i < richInfo.EffectedStr.Length; i++)
@@ -766,6 +775,13 @@ namespace SS.UIComponent
 
             for (var i = richInfo.StartIndex; i < richInfo.EndIndex; i++)
             {
+                // 为了检查是否需要渲染，先算start
+                var start = i * 4;
+                if (start >= vertCount)
+                {
+                    break;
+                }
+
                 // 跳过图标阴影
                 if (iconIndexes.Count != 0 && i == iconIndexes.Peek())
                 {
@@ -773,7 +789,6 @@ namespace SS.UIComponent
                     continue;
                 }
 
-                var start = i * 4;
                 var end = start + 4;
                 UIVertex vt;
                 for (var j = start; j < end; j++)
@@ -801,6 +816,12 @@ namespace SS.UIComponent
         /// </summary>
         private void ApplyOutlineEffect(RichInfo richInfo, IList<UIVertex> verts, int vertCount)
         {
+            // 先检查能不能被渲染出来，不能那就算了
+            if (richInfo.StartIndex * 4 >= vertCount)
+            {
+                return;
+            }
+
             int start = richInfo.StartIndex * 4;
             int end = Mathf.Min(richInfo.EndIndex * 4, vertCount);
             UIVertex vt;
@@ -829,8 +850,14 @@ namespace SS.UIComponent
         /// <summary>
         /// 图标效果
         /// </summary>
-        private (Sprite icon, UIVertex[] verts) ApplyIcon(RichInfo richInfo, IList<UIVertex> verts, Dictionary<string, Sprite> iconCache)
+        private (Sprite icon, UIVertex[] verts) ApplyIcon(RichInfo richInfo, IList<UIVertex> verts, Dictionary<string, Sprite> iconCache, int vertCount)
         {
+            // 先检查能不能被渲染出来，不能那就算了
+            if (richInfo.StartIndex * 4 >= vertCount)
+            {
+                return (null, null);
+            }
+            
             var iconName = richInfo.Content;
             Sprite iconSprite;
             if (!iconCache.TryGetValue(iconName, out iconSprite))
@@ -949,7 +976,7 @@ namespace SS.UIComponent
             }
         }
 
-        private static void CalculateRects(RichInfo richInfo, IList<UIVertex> vertices)
+        private static void CalculateRects(RichInfo richInfo, IList<UIVertex> vertices, int vertCount)
         {
             richInfo.Rects = new List<Vector4>();
             richInfo.RectIndexes = new List<int[]>();
@@ -963,6 +990,23 @@ namespace SS.UIComponent
             // 顶点是从左上的顺时针
             for (var i = startIndex; i < endIndex; i++)
             {
+                // 不显示的部分不处理
+                if (i * 4 >= vertCount)
+                {
+                    // 将最后一个位置作为收尾
+                    if (state == 1 && rect.z < 0)
+                    {
+                        var vert = vertices[vertCount - 3];
+                        rect.z = vert.position.x;
+                        rect.w = vert.position.y;
+                        state = 0;
+                        indexes[1] = i;
+                        richInfo.Rects.Add(rect);
+                        richInfo.RectIndexes.Add(indexes);
+                    }
+                    break;
+                }
+
                 if (state == 0)
                 {
                     if (rect.x < 0)
@@ -1013,6 +1057,41 @@ namespace SS.UIComponent
                 richInfo.Rects.Add(rect);
                 richInfo.RectIndexes.Add(indexes);
             }
+        }
+
+        private static IList<UIVertex> ProcessRawTags(IList<UIVertex> vertices, string resultText, string textWithoutTag)
+        {
+            // 得先确认顶点是否需要修改
+            if (vertices.Count == textWithoutTag.Length * 4)
+            {
+                return vertices;
+            }
+
+            // 通过记录的标签信息得到真实的顶点信息
+            var newVertices = new List<UIVertex>(vertices.Count);
+            for (int i = 0, j = 0; i < resultText.Length; i++)
+            {
+                var char1 = resultText[i];
+                var char2 = textWithoutTag[j];
+                if (char1 != char2)
+                {
+                    continue;
+                }
+                
+                // 在部分行无法显示时，顶点虽然包含标签但不包含不显示的内容，这里要做判断
+                if (vertices.Count <= i * 4)
+                {
+                    break;
+                }
+
+                j++;
+                newVertices.Add(vertices[i * 4]);
+                newVertices.Add(vertices[i * 4 + 1]);
+                newVertices.Add(vertices[i * 4 + 2]);
+                newVertices.Add(vertices[i * 4 + 3]);
+            }
+
+            return newVertices;
         }
         
         #endregion
