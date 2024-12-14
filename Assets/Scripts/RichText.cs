@@ -280,9 +280,7 @@ namespace SS.UIComponent
             
             if (font == null)
                 return;
-            
-            // 先把下划线用的uv清掉
-            underlineUVs = null;
+
             // 文本处理
             richInfos = ProcessRichText(text, out var resultText);
 
@@ -435,6 +433,8 @@ namespace SS.UIComponent
                 }
             }
 
+            // 计算完把下划线用的uv清掉
+            underlineUVs = null;
             // 避免同时更新渲染
             StartCoroutine(CallIconUpdate(iconInfos, icons, iconVerts));
 
@@ -498,334 +498,59 @@ namespace SS.UIComponent
             resultText = richText;
             var richInfos = new List<RichInfo>();
             var tags = new List<TagInfo>();
+
+            Color GetColor(string colorStr)
+            {
+                if (!Colors.TryGetValue(colorStr, out var tagColor))
+                {
+                    ColorUtility.TryParseHtmlString(colorStr, out tagColor);
+                }
+                return tagColor;
+            }
             
             // 图标
-            var iconMatches = IconRegex.Matches(resultText);
-            for (int i = 0; i < iconMatches.Count; i++)
+            tags.AddRange(GetTags(resultText, IconRegex, RichType.Icon, true, (str, info) =>
             {
-                var match = iconMatches[i];
-                var length = match.Length;
-                // 图标对应的索引
-                var index = match.Index;
-                var iconName = match.Groups[1].Value;
-                var tagInfo = new TagInfo()
-                {
-                    Type = RichType.Icon,
-                    IsClose = true,
-                    Index = index,
-                    Length = length,
-                    Content = iconName,
-                    Color = Color.white,
-                };
-                
-                tags.Add(tagInfo);
-            }
+                info.Content = str;
+                info.Color = Color.white;
+            }));
 
             // 描边
-            var outlineMatches = OutlineRegex.Matches(resultText);
-            var outlineEndMatches = OutlineEndRegex.Matches(resultText);
-            for (int i = 0; i < outlineMatches.Count; i++)
-            {
-                var startMatch = outlineMatches[i];
-                var startIndex = startMatch.Index;
-                var startLength = startMatch.Length;
-
-                var colorStr = startMatch.Groups[1].Value;
-                Color color;
-                if (!Colors.TryGetValue(colorStr, out color))
-                {
-                    ColorUtility.TryParseHtmlString(colorStr, out color);
-                }
-                
-                var tagInfo = new TagInfo()
-                {
-                    Type = RichType.Outline,
-                    Index = startIndex,
-                    Length = startLength,
-                    Color = color,
-                };
-                
-                tags.Add(tagInfo);
-            }
-
-            for (int i = 0; i < outlineEndMatches.Count; i++)
-            {
-                var endMatch = outlineEndMatches[i];
-                var endIndex = endMatch.Index;
-                var endLength = endMatch.Length;
-                
-                var tagInfo = new TagInfo()
-                {
-                    Type = RichType.Outline,
-                    IsClose = true,
-                    Index = endIndex,
-                    Length = endLength,
-                };
-
-                tags.Add(tagInfo);
-            }
+            tags.AddRange(GetTags(resultText, OutlineRegex, RichType.Outline,
+                paramProcessor: (str, info) => { info.Color = GetColor(str); }));
+            tags.AddRange(GetTags(resultText, OutlineEndRegex, RichType.Outline, isCloseTag: true));
             
             // 阴影
-            var shadowMatches = ShadowRegex.Matches(resultText);
-            var shadowEndMatches = ShadowEndRegex.Matches(resultText);
-            for (int i = 0; i < shadowMatches.Count; i++)
-            {
-                var startMatch = shadowMatches[i];
-                var startIndex = startMatch.Index;
-                var startLength = startMatch.Length;
-
-                var tagInfo = new TagInfo()
-                {
-                    Type = RichType.Shadow,
-                    Index = startIndex,
-                    Length = startLength,
-                };
-                
-                tags.Add(tagInfo);
-            }
-
-            for (int i = 0; i < shadowEndMatches.Count; i++)
-            {
-                var endMatch = shadowEndMatches[i];
-                var endIndex = endMatch.Index;
-                var endLength = endMatch.Length;
-
-                var tagInfo = new TagInfo()
-                {
-                    Type = RichType.Shadow,
-                    IsClose = true,
-                    Index = endIndex,
-                    Length = endLength,
-                };
-
-                tags.Add(tagInfo);
-            }
+            tags.AddRange(GetTags(resultText, ShadowRegex, RichType.Shadow,
+                paramProcessor: (str, info) => { info.Color = GetColor(str); }));
+            tags.AddRange(GetTags(resultText, ShadowEndRegex, RichType.Shadow, isCloseTag: true));
             
             // 颜色
-            var colorMatches = ColorRegex.Matches(resultText);
-            var colorEndMatches = ColorEndRegex.Matches(resultText);
-            for (int i = 0; i < colorMatches.Count; i++)
-            {
-                var startMatch = colorMatches[i];
-                var startIndex = startMatch.Index;
-                var startLength = startMatch.Length;
-
-                var tagInfo = new TagInfo()
-                {
-                    Type = RichType.Color,
-                    Index = startIndex,
-                    Length = startLength,
-                };
-                
-                tags.Add(tagInfo);
-            }
-
-            for (int i = 0; i < colorEndMatches.Count; i++)
-            {
-                var endMatch = colorEndMatches[i];
-                var endIndex = endMatch.Index;
-                var endLength = endMatch.Length;
-                
-                var tagInfo = new TagInfo()
-                {
-                    Type = RichType.Color,
-                    IsClose = true,
-                    Index = endIndex,
-                    Length = endLength,
-                };
-
-                tags.Add(tagInfo);
-            }
+            tags.AddRange(GetTags(resultText, ColorRegex, RichType.Color,
+                paramProcessor: (str, info) => { info.Color = GetColor(str); }));
+            tags.AddRange(GetTags(resultText, ColorEndRegex, RichType.Color, isCloseTag: true));
             
             // 大小
-            var sizeMatches = SizeRegex.Matches(resultText);
-            var sizeEndMatches = SizeEndRegex.Matches(resultText);
-            for (int i = 0; i < sizeMatches.Count; i++)
-            {
-                var startMatch = sizeMatches[i];
-                var startIndex = startMatch.Index;
-                var startLength = startMatch.Length;
-
-                var tagInfo = new TagInfo()
-                {
-                    Type = RichType.Size,
-                    Index = startIndex,
-                    Length = startLength,
-                };
-                
-                tags.Add(tagInfo);
-            }
-
-            for (int i = 0; i < sizeEndMatches.Count; i++)
-            {
-                var endMatch = sizeEndMatches[i];
-                var endIndex = endMatch.Index;
-                var endLength = endMatch.Length;
-                
-                var tagInfo = new TagInfo()
-                {
-                    Type = RichType.Size,
-                    IsClose = true,
-                    Index = endIndex,
-                    Length = endLength,
-                };
-
-                tags.Add(tagInfo);
-            }
+            tags.AddRange(GetTags(resultText, SizeRegex, RichType.Size, paramProcessor: (str, info) => { info.Content = str; }));
+            tags.AddRange(GetTags(resultText, SizeEndRegex, RichType.Size, isCloseTag: true));
             
             // 斜体
-            var italicMatches = ItalicRegex.Matches(resultText);
-            var italicEndMatches = ItalicEndRegex.Matches(resultText);
-            for (int i = 0; i < italicMatches.Count; i++)
-            {
-                var startMatch = italicMatches[i];
-                var startIndex = startMatch.Index;
-                var startLength = startMatch.Length;
-
-                var tagInfo = new TagInfo()
-                {
-                    Type = RichType.Italic,
-                    Index = startIndex,
-                    Length = startLength,
-                };
-                
-                tags.Add(tagInfo);
-            }
-
-            for (int i = 0; i < italicEndMatches.Count; i++)
-            {
-                var endMatch = italicEndMatches[i];
-                var endIndex = endMatch.Index;
-                var endLength = endMatch.Length;
-                
-                var tagInfo = new TagInfo()
-                {
-                    Type = RichType.Italic,
-                    IsClose = true,
-                    Index = endIndex,
-                    Length = endLength,
-                };
-
-                tags.Add(tagInfo);
-            }
+            tags.AddRange(GetTags(resultText, ItalicRegex, RichType.Italic));
+            tags.AddRange(GetTags(resultText, ItalicEndRegex, RichType.Italic, isCloseTag: true));
             
             // 粗体
-            var boldMatches = BoldRegex.Matches(resultText);
-            var boldEndMatches = BoldEndRegex.Matches(resultText);
-            for (int i = 0; i < boldMatches.Count; i++)
-            {
-                var startMatch = boldMatches[i];
-                var startIndex = startMatch.Index;
-                var startLength = startMatch.Length;
-
-                var tagInfo = new TagInfo()
-                {
-                    Type = RichType.Bold,
-                    Index = startIndex,
-                    Length = startLength,
-                };
-                
-                tags.Add(tagInfo);
-            }
-
-            for (int i = 0; i < boldEndMatches.Count; i++)
-            {
-                var endMatch = boldEndMatches[i];
-                var endIndex = endMatch.Index;
-                var endLength = endMatch.Length;
-                
-                var tagInfo = new TagInfo()
-                {
-                    Type = RichType.Bold,
-                    IsClose = true,
-                    Index = endIndex,
-                    Length = endLength,
-                };
-
-                tags.Add(tagInfo);
-            }
+            tags.AddRange(GetTags(resultText, BoldRegex, RichType.Bold));
+            tags.AddRange(GetTags(resultText, BoldEndRegex, RichType.Bold, isCloseTag: true));
             
             // 下划线
-            var underlineMatches = UnderlineRegex.Matches(resultText);
-            var underlineEndMatches = UnderlineEndRegex.Matches(resultText);
-            for (int i = 0; i < underlineMatches.Count; i++)
-            {
-                var startMatch = underlineMatches[i];
-                var startIndex = startMatch.Index;
-                var startLength = startMatch.Length;
-                var colorStr = startMatch.Groups[1].Value;
-
-                Color color;
-                if (!Colors.TryGetValue(colorStr, out color))
-                {
-                    ColorUtility.TryParseHtmlString(colorStr, out color);
-                }
-
-                var tagInfo = new TagInfo()
-                {
-                    Type = RichType.Underline,
-                    Index = startIndex,
-                    Length = startLength,
-                    Color = color,
-                };
-                
-                tags.Add(tagInfo);
-            }
-            
-            for (int i = 0; i < underlineEndMatches.Count; i++)
-            {
-                var endMatch = underlineEndMatches[i];
-                var endIndex = endMatch.Index;
-                var endLength = endMatch.Length;
-                
-                var tagInfo = new TagInfo()
-                {
-                    Type = RichType.Underline,
-                    IsClose = true,
-                    Index = endIndex,
-                    Length = endLength,
-                };
-
-                tags.Add(tagInfo);
-            }
+            tags.AddRange(GetTags(resultText, UnderlineRegex, RichType.Underline,
+                paramProcessor: (str, info) => { info.Color = GetColor(str); }));
+            tags.AddRange(GetTags(resultText, UnderlineEndRegex, RichType.Underline, isCloseTag: true));
             
             // link
-            var linkMatches = LinkRegex.Matches(resultText);
-            var linkEndMatches = LinkEndRegex.Matches(resultText);
-            for (int i = 0; i < linkMatches.Count; i++)
-            {
-                var startMatch = linkMatches[i];
-                var startIndex = startMatch.Index;
-                var startLength = startMatch.Length;
-                var url = startMatch.Groups[1].Value;
-
-                var tagInfo = new TagInfo()
-                {
-                    Type = RichType.Link,
-                    Index = startIndex,
-                    Length = startLength,
-                    Content = url,
-                };
-                
-                tags.Add(tagInfo);
-            }
-            
-            for (int i = 0; i < linkEndMatches.Count; i++)
-            {
-                var endMatch = linkEndMatches[i];
-                var endIndex = endMatch.Index;
-                var endLength = endMatch.Length;
-                
-                var tagInfo = new TagInfo()
-                {
-                    Type = RichType.Link,
-                    IsClose = true,
-                    Index = endIndex,
-                    Length = endLength,
-                };
-
-                tags.Add(tagInfo);
-            }
+            tags.AddRange(GetTags(resultText, LinkRegex, RichType.Link,
+                paramProcessor: (str, info) => { info.Content = str; }));
+            tags.AddRange(GetTags(resultText, LinkEndRegex, RichType.Link, isCloseTag: true));
 
             // 空格的位置
             var spaceIndexes = new Queue<int>(GetWhiteSpaceIndexesInString(richText));
@@ -975,6 +700,32 @@ namespace SS.UIComponent
             return richInfos;
         }
 
+        private List<TagInfo> GetTags(string richText, Regex tagRegex, RichType richType, bool isCloseTag = false, Action<string, TagInfo> paramProcessor = null)
+        {
+            var tags = new List<TagInfo>();
+            var matches = tagRegex.Matches(richText);
+            for (int i = 0; i < matches.Count; i++)
+            {
+                var match = matches[i];
+                var index = match.Index;
+                var length = match.Length;
+                
+                var tagInfo = new TagInfo()
+                {
+                    Type = richType,
+                    Index = index,
+                    Length = length,
+                    IsClose = isCloseTag,
+                };
+                
+                paramProcessor?.Invoke(match.Groups[1].Value, tagInfo);
+                
+                tags.Add(tagInfo);
+            }
+
+            return tags;
+        }
+        
         private static List<int> GetWhiteSpaceIndexesInString(string str)
         {
             var result = new List<int>();
@@ -1062,7 +813,7 @@ namespace SS.UIComponent
                 iconSprite = iconProvider.GetIcon(iconName);
             }
 
-            if (underlineUVs == null)
+            if (underlineUVs == null || underlineUVs.Length == 0)
             {
                 underlineUVs = new Vector4[4];
             }
