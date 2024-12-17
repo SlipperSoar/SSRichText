@@ -225,6 +225,7 @@ namespace SS.UIComponent
 
         #region static
 
+#if UNITY_EDITOR
         [MenuItem("GameObject/UI/SS/Rich Text", false, 20)]
         static void CreateRichText()
         {
@@ -260,17 +261,20 @@ namespace SS.UIComponent
             // 选择新创建的 GameObject
             Selection.activeGameObject = richTextObject;
         }
+#endif
 
         #endregion
         
         #region override
 
+#if UNITY_EDITOR
         protected override void OnValidate()
         {
             base.OnValidate();
 
             iconProvider = new IconProvider();
         }
+#endif
 
         protected override void OnPopulateMesh(VertexHelper toFill)
         {
