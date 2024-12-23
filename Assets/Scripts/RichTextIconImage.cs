@@ -23,6 +23,10 @@ namespace SS.UIComponent
         private static readonly int Offset = Shader.PropertyToID("_Offset");
         private static readonly int Scale = Shader.PropertyToID("_Scale");
 
+        private int textureWidth;
+        private int textureHeight;
+        private RenderTexture rt;
+
         #endregion
         
         #region Public Methods
@@ -38,7 +42,8 @@ namespace SS.UIComponent
             }
             else
             {
-                texture = CombineSprites(icons);
+                rt = CombineSprites(icons);
+                texture = rt;
             }
         }
 
@@ -90,6 +95,8 @@ namespace SS.UIComponent
                 maxHeight = Mathf.Max(maxHeight, (int)sprite.rect.height);
             }
             
+            textureWidth = totalWidth;
+            textureHeight = maxHeight;
             var renderTexture = RenderTexture.GetTemporary(totalWidth, maxHeight);
             renderTexture.format = RenderTextureFormat.ARGB32;
             var prevRT = RenderTexture.active;
@@ -187,6 +194,27 @@ namespace SS.UIComponent
             // 添加图标的四个顶点所组成的矩形
             toFill.AddTriangle(vertCount - 4, vertCount - 3, vertCount - 2);
             toFill.AddTriangle(vertCount - 4, vertCount - 2, vertCount - 1);
+        }
+
+        /// <summary>
+        /// 将uv通过数学关系转换为偏移和缩放
+        /// </summary>
+        /// <param name="uv">图像的uv</param>
+        /// <param name="rect">图像sprite的rect</param>
+        /// <returns>图像的渲染偏移和缩放，offset=(x, y)，scale=(z, w)</returns>
+        private Vector4 UV2OffsetScale(Vector4 uv, Rect rect)
+        {
+            var os = new Vector4
+            {
+                // offset
+                x = uv.x - rect.x / textureWidth,
+                y = 0,
+                // scale
+                z = uv.z - uv.x + rect.x / textureWidth,
+                w = uv.w
+            };
+
+            return os;
         }
         
         #endregion
