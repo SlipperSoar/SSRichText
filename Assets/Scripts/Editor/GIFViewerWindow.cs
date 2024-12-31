@@ -10,7 +10,7 @@ namespace SS.Editor
     public class GIFViewerWindow : UnityEditor.EditorWindow
     {
         private float previewSize = 128f;
-        private List<(float delaySecond, Texture2D texture)> gifFrames;
+        private List<GifData> gifFrames;
         private string gifFilePath;
         private Texture2D gifFileTexture2D;
         private Vector2 scrollPosition;
@@ -25,7 +25,7 @@ namespace SS.Editor
         public static void ShowWindow()
         {
             var window = GetWindow<GIFViewerWindow>("GIF Viewer");
-            window.gifFrames = new List<(float delaySecond, Texture2D texture)>();
+            window.gifFrames = new List<GifData>();
         }
 
         void OnEnable()
@@ -82,15 +82,15 @@ namespace SS.Editor
             var currentFrame = gifFrames[currentPreviewIndex];
             var nextFrameIndex = (currentPreviewIndex + 1) % gifFrames.Count;
             var nextFrame = gifFrames[nextFrameIndex];
-            if (currentTime - lastFrameTime >= nextFrame.delaySecond)
+            if (currentTime - lastFrameTime >= nextFrame.DelaySecond)
             {
-                GUI.DrawTexture(previewRect, nextFrame.texture, ScaleMode.ScaleToFit);
+                GUI.DrawTexture(previewRect, nextFrame.FrameTexture, ScaleMode.ScaleToFit);
                 currentPreviewIndex = nextFrameIndex;
                 lastFrameTime = currentTime;
             }
             else
             {
-                GUI.DrawTexture(previewRect, currentFrame.texture, ScaleMode.ScaleToFit);
+                GUI.DrawTexture(previewRect, currentFrame.FrameTexture, ScaleMode.ScaleToFit);
             }
 
             scrollPosition = GUILayout.BeginScrollView(scrollPosition);
@@ -104,9 +104,9 @@ namespace SS.Editor
 
                 GUILayout.BeginVertical();
                 var frameData = gifFrames[i];
-                GUILayout.Label($"Frame {i}, Delay: {frameData.delaySecond} s");
+                GUILayout.Label($"Frame {i}, Delay: {frameData.DelaySecond} s");
                 Rect rect = GUILayoutUtility.GetRect(previewSize, previewSize);
-                GUI.DrawTexture(rect, frameData.texture, ScaleMode.ScaleToFit);
+                GUI.DrawTexture(rect, frameData.FrameTexture, ScaleMode.ScaleToFit);
                 GUILayout.EndVertical();
 
                 if (currentHorizontalCount == maxHorizontalCount - 1 || i == gifFrames.Count - 1)

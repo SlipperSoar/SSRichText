@@ -29,18 +29,18 @@ public class SampleSceneController : MonoBehaviour
         };
         
         // 测试gif的解析
-        StartCoroutine(GifDecoder.Decode(System.IO.File.ReadAllBytes("Assets/Resources/GIF0.gif"), frames =>
+        GifLoadManager.Instance.LoadGif("Assets/Resources/GIF0.gif", frames =>
         {
             StartCoroutine(PlayGif(frames));
-        }));
+        });
     }
 
-    IEnumerator PlayGif(List<(float delaySecond, Texture2D texture)> frames)
+    IEnumerator PlayGif(List<GifData> frames)
     {
         var index = 1;
         var countDown = 0f;
         
-        rawImage.texture = frames[0].texture;
+        rawImage.texture = frames[0].FrameTexture;
         rawImage.SetNativeSize();
         
         while (true)
@@ -51,10 +51,10 @@ public class SampleSceneController : MonoBehaviour
             }
             
             var frame = frames[index];
-            if (countDown >= frame.delaySecond)
+            if (countDown >= frame.DelaySecond)
             {
-                rawImage.texture = frame.texture;
-                countDown -= frame.delaySecond;
+                rawImage.texture = frame.FrameTexture;
+                countDown -= frame.DelaySecond;
                 index++;
             }
             

@@ -16,6 +16,19 @@ namespace SS.UIComponent
 {
     #region inner class
 
+    public class GifData
+    {
+        public float DelaySecond { get; private set; }
+        
+        public Texture2D FrameTexture { get; private set; }
+
+        public GifData(float delaySecond, Texture2D frameTexture)
+        {
+            DelaySecond = delaySecond;
+            FrameTexture = frameTexture;
+        }
+    }
+    
     public interface IGifExtensionBlock
     {
         byte BlockFlag { get; }
@@ -226,9 +239,9 @@ namespace SS.UIComponent
         /// <param name="bytes">Gif文件的字节数据</param>
         /// <param name="onComplete">解码完成的回调，参数为帧数据</param>
         /// <returns>迭代器，可用于协程，避免主线程阻塞</returns>
-        public static IEnumerator Decode(byte[] bytes, Action<List<(float delaySecond, Texture2D texture)>> onComplete)
+        public static IEnumerator Decode(byte[] bytes, Action<List<GifData>> onComplete)
         {
-            var frames = new List<(float delaySecond, Texture2D texture)>();
+            var frames = new List<GifData>();
             var byteIndex = 0;
             // Header
             var sb = new StringBuilder();
@@ -648,7 +661,7 @@ namespace SS.UIComponent
             return newBytes;
         }
 
-        private static (float delaySecond, Texture2D texture) ProcessTexturePixels(Texture2D texture2D, ImageBlock imageBlock, Color32 bgColor,
+        private static GifData ProcessTexturePixels(Texture2D texture2D, ImageBlock imageBlock, Color32 bgColor,
             GifGraphicExtensionBlock graphicExtensionBlock, Color32[] colorTable, Color32[] prevColors, out Color32[] colors)
         {
             var width = texture2D.width;
@@ -763,7 +776,7 @@ namespace SS.UIComponent
 #if UNITY_EDITOR
             Debug.Log($"Add frame, image block x: {imageBlock.XOffset}, y: {imageBlock.YOffset}, width: {imageBlock.Width}, height: {imageBlock.Height}, delay: {delayTime}");
 #endif
-            return (delayTime, texture2D);
+            return new GifData(delayTime, texture2D);
         }
 
         #region Extension Block
