@@ -24,6 +24,7 @@ GIF解码思路来自：[UnityGif](https://github.com/SleepyLoser/UnityGif) 和 
 |       \<icon=xxxx/>       | 图标  |             需要配合IconProvider使用              |
 | \<underline>\</underline> | 下划线 | \<underline=red>或\<underline=#ffffffff>设置颜色 |
 |    \<link=url>\</link>    | 链接  |               url可以填写具体的链接地址                |
+|       \<gif=xxxx/>        | 图标  |         需要配合GifDecoder和LoadManger使用         |
 
 支持富文本点击事件：
 
@@ -31,6 +32,7 @@ GIF解码思路来自：[UnityGif](https://github.com/SleepyLoser/UnityGif) 和 
 |:-------------------:|:-------:|:--------------:|:-----------------------------------------------:|
 | \<link=url>\</link> | OnClick |   type, url    |                        -                        |
 |    \<icon=xxxx/>    | OnClick | type, iconName |                        -                        |
+|    \<gif=xxxx/>     | OnClick | type, gifName  |                        -                        |
 |         默认          | OnClick |   type, 文本内容   | 包含outline、underline、shadow以及原生支持的color、size、b、i |
 
 ## 已实现或规划中功能
