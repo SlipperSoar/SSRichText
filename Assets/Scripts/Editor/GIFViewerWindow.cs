@@ -13,6 +13,7 @@ namespace SS.Editor
         private List<GifData> gifFrames;
         private string gifFilePath;
         private Texture2D gifFileTexture2D;
+        private TextAsset gifBytesAsset;
         private Vector2 scrollPosition;
         private const int maxHorizontalCount = 4;
         private int currentPreviewIndex = 0;
@@ -35,18 +36,33 @@ namespace SS.Editor
         
         private void OnGUI()
         {
-            GUILayout.Label("GIF Viewer", EditorStyles.boldLabel);
+            GUILayout.Label("GIF Viewer (Texture > TextAsset)", EditorStyles.boldLabel);
 
             gifFileTexture2D = (Texture2D)EditorGUILayout.ObjectField("Select GIF File", gifFileTexture2D, typeof(Texture2D), false);
-            if (gifFileTexture2D == null)
+            gifBytesAsset =
+                (TextAsset)EditorGUILayout.ObjectField("Select GIF Bytes File", gifBytesAsset, typeof(TextAsset),
+                    false);
+            if (!gifFileTexture2D && !gifBytesAsset)
             {
                 return;
             }
-            
-            string gifPath = AssetDatabase.GetAssetPath(gifFileTexture2D);
-            if (string.IsNullOrEmpty(gifPath) || !Path.GetExtension(gifPath).ToLower().Equals(".gif"))
+
+            string gifPath = null;
+            if (gifFileTexture2D)
             {
-                return;
+                gifPath = AssetDatabase.GetAssetPath(gifFileTexture2D);
+                if (string.IsNullOrEmpty(gifPath) || !Path.GetExtension(gifPath).ToLower().Equals(".gif"))
+                {
+                    return;
+                }
+            }
+            else if (gifBytesAsset)
+            {
+                gifPath = AssetDatabase.GetAssetPath(gifBytesAsset);
+                if (string.IsNullOrEmpty(gifPath))
+                {
+                    return;
+                }
             }
 
             if (isLoading)
@@ -67,7 +83,7 @@ namespace SS.Editor
                     gifFilePath = gifPath;
                     isLoading = true;
                     EditorApplication.update += OnEditorUpdate;
-                    LoadGifFile(gifPath);
+                    LoadGifFile(gifPath, !gifFileTexture2D);
                 }
             }
 
@@ -135,9 +151,10 @@ namespace SS.Editor
             }
         }
         
-        private void LoadGifFile(string gifPath)
+        private void LoadGifFile(string gifPath, bool isBytesAsset = false)
         {
-            var bytes = File.ReadAllBytes(gifPath);
+            var bytes = isBytesAsset ? gifBytesAsset.bytes : File.ReadAllBytes(gifPath);
+
             gifDecoder = GifDecoder.Decode(bytes, frames =>
             {
                 Debug.Log($"<color=yellow> Load GIF {gifFilePath} Over </color>");

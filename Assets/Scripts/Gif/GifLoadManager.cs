@@ -85,8 +85,11 @@ namespace SS.UIComponent
         
         #region Public Methods
 
-        public void LoadGif(string gifName, Action<List<GifData>> onComplete)
+        public void LoadGif(string gifName, bool useIO, Action<List<GifData>> onComplete)
         {
+#if UNITY_EDITOR
+            Debug.Log($"Load Gif: {gifName}, useIO: {useIO}");
+#endif
             if (gifLoadStatus.TryGetValue(gifName, out var isLoaded))
             {
                 if (isLoaded)
@@ -107,7 +110,17 @@ namespace SS.UIComponent
                 {
                     OnComplete = onComplete
                 };
-                StartCoroutine(GifDecoder.Decode(System.IO.File.ReadAllBytes(gifName), gifData =>
+                byte[] bytes = null;
+                if (useIO)
+                {
+                    bytes = System.IO.File.ReadAllBytes(gifName);
+                }
+                else
+                {
+                    bytes = Resources.Load<TextAsset>(gifName).bytes;
+                }
+                
+                StartCoroutine(GifDecoder.Decode(bytes, gifData =>
                 {
                     gifLoadStatus[gifName] = true;
                     var loadData = gifDatas[gifName];

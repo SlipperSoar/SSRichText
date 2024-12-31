@@ -29,7 +29,7 @@ public class SampleSceneController : MonoBehaviour
         };
         
         // 测试gif的解析
-        GifLoadManager.Instance.LoadGif("Assets/Resources/GIF0.gif", frames =>
+        GifLoadManager.Instance.LoadGif("GIF0", false, frames =>
         {
             StartCoroutine(PlayGif(frames));
         });
