@@ -11,6 +11,10 @@ GIF解码思路来自：[UnityGif](https://github.com/SleepyLoser/UnityGif) 和 
 
 使用的GIF图来自**网络**
 
+## 支持
+
+Unity版本：Unity2020或以上经过测试可用，Unity2019及以下或Unity6均未测试
+
 支持的富文本标签：
 
 |            标签             | 效果  |                     注释                      |
@@ -24,7 +28,7 @@ GIF解码思路来自：[UnityGif](https://github.com/SleepyLoser/UnityGif) 和 
 |       \<icon=xxxx/>       | 图标  |             需要配合IconProvider使用              |
 | \<underline>\</underline> | 下划线 | \<underline=red>或\<underline=#ffffffff>设置颜色 |
 |    \<link=url>\</link>    | 链接  |               url可以填写具体的链接地址                |
-|       \<gif=xxxx/>        | 图标  |         需要配合GifDecoder和LoadManger使用         |
+|       \<gif=xxxx/>        | 动图  |         需要配合GifDecoder和LoadManger使用         |
 
 支持富文本点击事件：
 
