@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System.Collections;
+using System.Collections.Generic;
 using System.IO;
 using SS.UIComponent;
 using UnityEditor;
@@ -16,6 +17,9 @@ namespace SS.Editor
         private const int maxHorizontalCount = 4;
         private int currentPreviewIndex = 0;
         private double lastFrameTime;
+        private bool isLoading = false;
+
+        private IEnumerator gifDecoder;
 
         [MenuItem("Window/GIF Viewer")]
         public static void ShowWindow()
@@ -45,22 +49,29 @@ namespace SS.Editor
                 return;
             }
 
-            if (GUILayout.Button("Load GIF File"))
+            if (isLoading)
+            {
+                GUILayout.Label("Loading...");
+                if (GUILayout.Button("Stop Load"))
+                {
+                    gifDecoder = null;
+                    isLoading = false;
+                    EditorApplication.update -= OnEditorUpdate;
+                }
+            }
+
+            if (GUILayout.Button("Load GIF File") && !isLoading)
             {
                 if (gifFilePath != gifPath)
                 {
                     gifFilePath = gifPath;
-                    var gifData = GifDecoder.Decode(gifPath);
-                    gifFrames.Clear();
-                    currentPreviewIndex = 0;
-                    while (gifData.MoveNext())
-                    {
-                        gifFrames.Add(gifData.Current);
-                    }
+                    isLoading = true;
+                    EditorApplication.update += OnEditorUpdate;
+                    LoadGifFile(gifPath);
                 }
             }
 
-            if (string.IsNullOrEmpty(gifFilePath) || gifFrames.Count == 0)
+            if (string.IsNullOrEmpty(gifFilePath) || isLoading || gifFrames.Count == 0)
             {
                 return;
             }
@@ -107,6 +118,33 @@ namespace SS.Editor
                 currentHorizontalCount %= maxHorizontalCount;
             }
             GUILayout.EndScrollView();
+        }
+
+        /// <summary>
+        /// 添加至Editor的Update，模拟协程运行
+        /// </summary>
+        private void OnEditorUpdate()
+        {
+            if (gifDecoder != null && gifDecoder.MoveNext())
+            {
+                Repaint();  // Refresh the window if necessary (e.g., for progress updates).
+            }
+            else
+            {
+                EditorApplication.update -= OnEditorUpdate;  // Stop updating when the coroutine finishes
+            }
+        }
+        
+        private void LoadGifFile(string gifPath)
+        {
+            var bytes = File.ReadAllBytes(gifPath);
+            gifDecoder = GifDecoder.Decode(bytes, frames =>
+            {
+                Debug.Log($"<color=yellow> Load GIF {gifFilePath} Over </color>");
+                gifFrames = frames;
+                currentPreviewIndex = 0;
+                isLoading = false;
+            });
         }
     }
 }

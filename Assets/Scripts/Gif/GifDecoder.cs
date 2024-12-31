@@ -77,6 +77,46 @@ namespace SS.UIComponent
     public class GifPlainTextExtensionBlock : IGifExtensionBlock
     {
         public byte BlockFlag => GifDecoder.GIF_PLAIN_TEXT_FLAG;
+
+        /// <summary>文本内容</summary>
+        public string Content { get; }
+        
+        /// <summary>文本框宽度</summary>
+        public ushort Width { get; }
+        
+        /// <summary>文本框高度</summary>
+        public ushort Height { get; }
+        
+        /// <summary>文本框左侧距离</summary>
+        public ushort LeftEdge { get; }
+        
+        /// <summary>文本框顶部距离</summary>
+        public ushort TopEdge { get; }
+        
+        /// <summary>字符单元格宽度</summary>
+        public byte CharacterCellWidth { get; }
+        
+        /// <summary>字符单元格高度</summary>
+        public byte CharacterCellHeight { get; }
+        
+        /// <summary>前景色索引</summary>
+        public byte ForegroundColorIndex { get; }
+        
+        /// <summary>背景色索引</summary>
+        public byte BackgroundColorIndex { get; }
+
+        public GifPlainTextExtensionBlock(string content, ushort width, ushort height, ushort leftEdge, ushort topEdge, byte characterCellWidth, byte characterCellHeight, byte foregroundColorIndex, byte backgroundColorIndex)
+        {
+            Content = content;
+            Width = width;
+            Height = height;
+            LeftEdge = leftEdge;
+            TopEdge = topEdge;
+            CharacterCellWidth = characterCellWidth;
+            CharacterCellHeight = characterCellHeight;
+            ForegroundColorIndex = foregroundColorIndex;
+            BackgroundColorIndex = backgroundColorIndex;
+        }
     }
     
     /// <summary>
@@ -180,10 +220,15 @@ namespace SS.UIComponent
 
         #endregion
         
-        public static IEnumerator<(float delaySecond, Texture2D texture)> Decode(string filePath)
+        /// <summary>
+        /// 解码GIF
+        /// </summary>
+        /// <param name="bytes">Gif文件的字节数据</param>
+        /// <param name="onComplete">解码完成的回调，参数为帧数据</param>
+        /// <returns>迭代器，可用于协程，避免主线程阻塞</returns>
+        public static IEnumerator Decode(byte[] bytes, Action<List<(float delaySecond, Texture2D texture)>> onComplete)
         {
-            var res = new List<(float delaySecond, Texture2D texture)>();
-            var bytes = File.ReadAllBytes(filePath);
+            var frames = new List<(float delaySecond, Texture2D texture)>();
             var byteIndex = 0;
             // Header
             var sb = new StringBuilder();
@@ -196,14 +241,17 @@ namespace SS.UIComponent
             var header = sb.ToString();
             if (header[0] != 'G' || header[1] != 'I' || header[2] != 'F')
             {
+#if UNITY_EDITOR
                 Debug.LogError($"This is not a GIF!");
+#endif
                 yield break;
             }
 
             // 版本：87a或89a
-            var version = header.Substring(3, 3);
-
+            // var version = header.Substring(3, 3);
+#if UNITY_EDITOR
             Debug.Log($"Header: {header}");
+#endif
             
             // 逻辑屏幕标识符
             // 2字节的宽度信息
@@ -226,7 +274,9 @@ namespace SS.UIComponent
             var backgroundColorIndex = bytes[byteIndex++];
             // 像素宽高比
             var pixelAspectRatio = bytes[byteIndex++];
+#if UNITY_EDITOR
             Debug.Log($"Screen: {screenWidth}x{screenHeight} flag byte: {flagByte}, globalColorTableFlag: {globalColorTableFlag}, colorResolution: {colorResolution}, sortFlag: {sortFlag}, globalColorTableSize: {globalColorTableSize}, backgroundColorIndex: {backgroundColorIndex}, pixelAspectRatio: {pixelAspectRatio}");
+#endif
             
             // 当全局颜色表不存在时，背景色用Clear色（无色）
             var bgColor = new Color32(0, 0, 0, 0);
@@ -244,8 +294,12 @@ namespace SS.UIComponent
                 }
 
                 bgColor = globalColorTable[backgroundColorIndex];
+#if UNITY_EDITOR
                 Debug.Log($"GlobalColorTable Length: {globalColorTable.Length}, background color: {globalColorTable[backgroundColorIndex]}");
+#endif
             }
+
+            yield return null;
             
             // 图像块标识符
             IGifExtensionBlock extensionBlock = null;
@@ -256,13 +310,16 @@ namespace SS.UIComponent
                 var blockFlag = bytes[byteIndex++];
                 if (blockFlag == GIF_SIGNATURE)
                 {
-                    Debug.Log($"image block flag: {blockFlag}({blockFlag:x2})");
                     var imageBlock = ReadImageDataBlock(bytes, screenSize, ref byteIndex);
                     if (imageBlock.UseInterlace)
                     {
+#if UNITY_EDITOR
                         Debug.Log($"Decode interlace data");
+#endif
                         imageBlock.ImageData= ProcessInterlaceData(imageBlock, screenWidth, screenHeight);
                     }
+                    
+                    yield return null;
                     
                     var texture = new Texture2D(screenWidth, screenHeight, TextureFormat.ARGB32, false);
                     var usingColorTable = imageBlock.LocalColorTable ?? globalColorTable;
@@ -271,21 +328,26 @@ namespace SS.UIComponent
                         // TODO: 使用系统颜色表
                     }
 
-                    yield return ProcessTexturePixels(texture, imageBlock, bgColor, extensionBlock as GifGraphicExtensionBlock,
+                    var frame = ProcessTexturePixels(texture, imageBlock, bgColor, extensionBlock as GifGraphicExtensionBlock,
                         usingColorTable, prevColors, out var colors);
+                    frames.Add(frame);
+                    yield return null;
 
                     prevColors = colors;
                 }
                 else if (blockFlag == GIF_Extension_BLOCK_FLAG) // 扩展块，会影响接下来一个图像数据块
                 {
-                    Debug.Log($"extension block flag: {blockFlag}({blockFlag:x2})");
                     extensionBlock = ReadExtensionBlock(bytes, ref byteIndex);
                 }
                 else
                 {
+#if UNITY_EDITOR
                     Debug.Log($"unknown block flag: {blockFlag}({blockFlag:x2})");
+#endif
                 }
             }
+            
+            onComplete?.Invoke(frames);
         }
 
         #region Private Methods
@@ -307,7 +369,9 @@ namespace SS.UIComponent
             var interlaceFlag = (flagByte & 0b01000000) != 0;
             var sortFlag = (flagByte & 0b00100000) != 0;
             var localColorTableSize = 2 << (flagByte & 0b00000111);
+#if UNITY_EDITOR
             Debug.Log($"Image: ({xOffset},{yOffset}), {width}x{height}, localColorTableFlag: {localColorTableFlag}, interlaceFlag: {interlaceFlag}, sortFlag: {sortFlag}, localColorTableSize: {localColorTableSize}");
+#endif
 
             var imageSize = width * height;
             
@@ -323,13 +387,18 @@ namespace SS.UIComponent
                     var b = bytes[byteIndex++];
                     localColorTable[i] = new Color32(r, g, b, 255);
                 }
+                
+#if UNITY_EDITOR
                 Debug.Log($"LocalColorTable Length: {localColorTable.Length}");
+#endif
             }
 
             // LZW压缩
             var lzwMinCodeSize = bytes[byteIndex++];
             var lzwSize = 1 << lzwMinCodeSize;
+#if UNITY_EDITOR
             Debug.Log($"LZW Size: {lzwSize}");
+#endif
             var clearCode = lzwSize;
             
             // 读取所有的子数据块并合并成完整的数据流
@@ -339,7 +408,9 @@ namespace SS.UIComponent
             {
                 if (byteIndex >= bytes.Length)
                 {
+#if UNITY_EDITOR
                     Debug.LogError($"index out of range, byteIndex: {byteIndex}, bytes.Length: {bytes.Length}");
+#endif
                     break;
                 }
                 var size = bytes[byteIndex++];
@@ -359,7 +430,9 @@ namespace SS.UIComponent
             // 将整个字节数据流转换成bit数据流并用于解码
             var bitData = new BitArray(totalData.ToArray());
             var decodedBytes = DecodeImageBlockData(bitData, clearCode, lzwMinCodeSize, imageSize);
+#if UNITY_EDITOR
             Debug.Log($"decoded bytes: {decodedBytes?.Length}");
+#endif
 
             return new ImageBlock()
             {
@@ -406,7 +479,9 @@ namespace SS.UIComponent
             
             InitTable();
             
+#if UNITY_EDITOR
             Debug.Log($"[LZW Decode] Clear Code: {clearCode}, code size (lzw min code size + 1): {codeSize}");
+#endif
             
             while (bitIndex < imageData.Length)
             {
@@ -417,14 +492,18 @@ namespace SS.UIComponent
                 // clearCode表示重置编码表
                 if (value == clearCode)
                 {
+#if UNITY_EDITOR
                     Debug.Log($"[LZW Decode] Code Table Reset With Clear Code, code table size: {codeTable.Count}, code size: {codeSize}");
+#endif
                     InitTable();
                     continue;
                 }
                 // clearCode + 1表示结束标志
                 else if (value == endCode)
                 {
+#if UNITY_EDITOR
                     Debug.Log($"[LZW Decode] Decode LZW End With:  clear code + 1");
+#endif
                     break;
                 }
                 else if (codeTable.ContainsKey(value))
@@ -462,7 +541,9 @@ namespace SS.UIComponent
                     }
                     else
                     {
+#if UNITY_EDITOR
                         Debug.LogError($"[LZW Decode] Should not happen, index value: {value}, code table size: {codeTable.Count}, lzw min size: {lzwMinCodeSize}, code size: {codeSize}");
+#endif
                         continue;
                     }
                 }
@@ -496,7 +577,9 @@ namespace SS.UIComponent
                 {
                     codeSize++;
                     maxTableSize = 1 << codeSize;
+#if UNITY_EDITOR
                     Debug.Log($"[LZW Decode] Code Table Size Increase, code table size: {codeTable.Count}, code size: {codeSize}, next max table size: {maxTableSize}");
+#endif
                 }
 
                 // Debug.Log($"Code: {value}, table count: {codeTable.Count}, bit index: {bitIndex}, data length: {imageData.Length}, code size: {codeSize}");
@@ -632,7 +715,9 @@ namespace SS.UIComponent
                             tempColors = prevColors;
                         else
                         {
-                            Debug.LogError($"graphicExtensionBlock.ExecuteMethod is GraphicExecuteMethod.DoNotDispose, but prevColors is null");
+#if UNITY_EDITOR
+                            Debug.LogWarning($"graphicExtensionBlock.ExecuteMethod is GraphicExecuteMethod.DoNotDispose, but prevColors is null");
+#endif
                         }
 
                         FillTexture(true);
@@ -648,7 +733,9 @@ namespace SS.UIComponent
                     {
                         if (prevColors == null)
                         {
-                            Debug.LogError($"graphicExtensionBlock.ExecuteMethod is GraphicExecuteMethod.RecoveryToPrev, but prevColors is null");
+#if UNITY_EDITOR
+                            Debug.LogWarning($"graphicExtensionBlock.ExecuteMethod is GraphicExecuteMethod.RecoveryToPrev, but prevColors is null");
+#endif
                             tempColors.FillArray(bgColor);
                             break;
                         }
@@ -673,7 +760,9 @@ namespace SS.UIComponent
             }
 
             texture2D.Apply();
+#if UNITY_EDITOR
             Debug.Log($"Add frame, image block x: {imageBlock.XOffset}, y: {imageBlock.YOffset}, width: {imageBlock.Width}, height: {imageBlock.Height}, delay: {delayTime}");
+#endif
             return (delayTime, texture2D);
         }
 
@@ -686,19 +775,15 @@ namespace SS.UIComponent
             {
                 // 注释扩展块
                 case GIF_COMMENT_FLAG:
-                    Debug.Log($"comment extension block flag: {extensionFlag}({extensionFlag:x2})");
                     return ReadCommentExtensionBlock(bytes, ref byteIndex);
                 // 文本扩展块
                 case GIF_PLAIN_TEXT_FLAG:
-                    Debug.Log($"plain text extension block flag: {extensionFlag}({extensionFlag:x2})");
                     return ReadPlainTextExtensionBlock(bytes, ref byteIndex);
                 // 图像处理扩展块
                 case GIF_GRAPHIC_CONTROL_FLAG:
-                    Debug.Log($"graphic control extension block flag: {extensionFlag}({extensionFlag:x2})");
                     return ReadGraphicExtensionBlock(bytes, ref byteIndex);
                 // 应用扩展块
                 case GIF_APPLICATION_FLAG:
-                    Debug.Log($"application extension block flag: {extensionFlag}({extensionFlag:x2})");
                     return ReadApplicationExtensionBlock(bytes, ref byteIndex);
             }
 
@@ -728,7 +813,9 @@ namespace SS.UIComponent
             var expectUserInput = (flagByte & 0b00000010) != 0;
             // 是否使用透明色（第8位）
             var transparentColorFlag = (flagByte & 0b00000001) != 0;
+#if UNITY_EDITOR
             Debug.Log($"Graphic Control: flag byte: (Binary) {flagByte.ToBinaryString()}, executeMethod: {executeMethod}, expectUserInput: {expectUserInput}, transparentColorFlag: {transparentColorFlag}");
+#endif
             
             // 延迟时间，单位1/100 秒，如果值不为1，表示暂停规定的时间后再继续往下处理数据流
             var delayTime = BitConverter.ToUInt16(bytes, byteIndex);
@@ -737,7 +824,9 @@ namespace SS.UIComponent
             var transparentColorIndex = bytes[byteIndex++];
             // 块终结标识
             var endCode = bytes[byteIndex++];
+#if UNITY_EDITOR
             Debug.Log($"graphic extension control block end");
+#endif
             return new GifGraphicExtensionBlock(executeMethod, transparentColorFlag, transparentColorIndex, delayTime);
         }
 
@@ -778,9 +867,11 @@ namespace SS.UIComponent
                 sb.Append((char)byteValue);
             }
             
+#if UNITY_EDITOR
             Debug.Log($"plain text: {sb}");
+#endif
             // TODO: 填充数据
-            return new GifPlainTextExtensionBlock();
+            return new GifPlainTextExtensionBlock(sb.ToString(), width, height, leftEdge, topEdge, characterCellWidth, characterCellHeight, foregroundColorIndex, backgroundColorIndex);
         }
         
         private static GifCommentExtensionBlock ReadCommentExtensionBlock(byte[] bytes, ref int byteIndex)
@@ -793,7 +884,6 @@ namespace SS.UIComponent
                 {
                     break;
                 }
-                
             }
 
             return GifCommentExtensionBlock.EmptyBlock;

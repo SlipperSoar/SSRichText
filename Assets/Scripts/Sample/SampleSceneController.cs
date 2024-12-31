@@ -29,11 +29,10 @@ public class SampleSceneController : MonoBehaviour
         };
         
         // 测试gif的解析
-        // var gifData = GifDecoder.Decode("Assets/Resources/GIF0.gif");
-        // if (gifData != null)
-        // {
-        //     StartCoroutine(PlayGif(gifData));
-        // }
+        StartCoroutine(GifDecoder.Decode(System.IO.File.ReadAllBytes("Assets/Resources/GIF0.gif"), frames =>
+        {
+            StartCoroutine(PlayGif(frames));
+        }));
     }
 
     IEnumerator PlayGif(List<(float delaySecond, Texture2D texture)> frames)

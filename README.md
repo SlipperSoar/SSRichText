@@ -33,6 +33,17 @@ GIF解码思路来自：[UnityGif](https://github.com/SleepyLoser/UnityGif) 和 
 |    \<icon=xxxx/>    | OnClick | type, iconName |                        -                        |
 |         默认          | OnClick |   type, 文本内容   | 包含outline、underline、shadow以及原生支持的color、size、b、i |
 
+## 已实现或规划中功能
+
+- [x] outline描边标签
+- [x] shadow阴影标签
+- [x] underline下划线标签
+- [x] icon图标标签
+- [x] link标签
+- [x] 富文本点击事件
+- [ ] GIF的文本渲染到帧图上
+- [ ] GIF显示在富文本
+
 # 效果图
 
 ![效果](DocImages/PixPin_2024-12-14_16-20-52.png)
