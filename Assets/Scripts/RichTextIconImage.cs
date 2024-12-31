@@ -9,6 +9,7 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 using UnityEngine.UI;
+using RichInfo = SS.UIComponent.RichText.RichInfo;
 
 namespace SS.UIComponent
 {
@@ -19,9 +20,9 @@ namespace SS.UIComponent
     {
         #region properties
 
-        private List<RichText.RichInfo> _sprites;
+        private List<RichInfo> _sprites;
         private List<UIVertex[]> _vertices;
-        private Dictionary<RichText.RichInfo, UIVertex[]> _gifs;
+        private Dictionary<RichInfo, UIVertex[]> _gifs;
         private LinkedList<int> _iconShadows;
         private static readonly int Offset = Shader.PropertyToID("_Offset");
         private static readonly int Scale = Shader.PropertyToID("_Scale");
@@ -29,14 +30,14 @@ namespace SS.UIComponent
         private int textureWidth;
         private int textureHeight;
         private RenderTexture rt;
-        private List<Coroutine> gifCoroutines = new List<Coroutine>();
+        private Dictionary<RichInfo, Coroutine> gifCoroutines = new();
         private Material blitMaterial;
 
         #endregion
         
         #region Public Methods
 
-        public void SetIcons(List<RichText.RichInfo> iconInfos, Dictionary<string, Sprite> icons, List<UIVertex[]> vertices, LinkedList<int> iconShadows, Dictionary<RichText.RichInfo, UIVertex[]> gifs)
+        public void SetIcons(List<RichInfo> iconInfos, Dictionary<string, Sprite> icons, List<UIVertex[]> vertices, LinkedList<int> iconShadows, Dictionary<RichInfo, UIVertex[]> gifs)
         {
             _sprites = iconInfos;
             _vertices = vertices;
@@ -53,7 +54,7 @@ namespace SS.UIComponent
                 // 单个动图
                 foreach (var gif in gifs)
                 {
-                    ApplySingleGif(gif.Key.Content, gif.Value);
+                    ApplySingleGif(gif.Key, gif.Value);
                     break;
                 }
             }
@@ -243,7 +244,12 @@ namespace SS.UIComponent
                 
                 GifLoadManager.Instance.LoadGif(gif.Key.Content, frames =>
                 {
-                    gifCoroutines.Add(StartCoroutine(PlayGif(gif.Key, frames)));
+                    if (gifCoroutines.ContainsKey(gif.Key))
+                    {
+                        return;
+                    }
+
+                    gifCoroutines.Add(gif.Key, StartCoroutine(PlayGif(gif.Key, frames)));
                 });
             }
 
@@ -251,11 +257,11 @@ namespace SS.UIComponent
             return renderTexture;
         }
 
-        private void ApplySingleGif(string gifName, UIVertex[] vertices)
+        private void ApplySingleGif(RichInfo richInfo, UIVertex[] vertices)
         {
-            GifLoadManager.Instance.LoadGif(gifName, frames =>
+            GifLoadManager.Instance.LoadGif(richInfo.Content, frames =>
             {
-                gifCoroutines.Add(StartCoroutine(PlaySingleGif(frames)));
+                gifCoroutines.Add(richInfo, StartCoroutine(PlaySingleGif(frames)));
             });
         }
 
@@ -365,7 +371,7 @@ namespace SS.UIComponent
             {
                 foreach (var gifCoroutine in gifCoroutines)
                 {
-                    StopCoroutine(gifCoroutine);
+                    StopCoroutine(gifCoroutine.Value);
                 }
             }
             
@@ -404,7 +410,7 @@ namespace SS.UIComponent
             }
         }
         
-        IEnumerator PlayGif(RichText.RichInfo gifInfo, List<GifData> frames)
+        IEnumerator PlayGif(RichInfo gifInfo, List<GifData> frames)
         {
             var index = 1;
             var countDown = 0f;
