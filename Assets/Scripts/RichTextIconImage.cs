@@ -217,6 +217,26 @@ namespace SS.UIComponent
             return os;
         }
         
+        /// <summary>
+        /// 将uv通过数学关系转换为偏移和缩放（不含rect，即默认0偏移）
+        /// </summary>
+        /// <param name="uv">图像的uv</param>
+        /// <returns>图像的渲染偏移和缩放，offset=(x, y)，scale=(z, w)</returns>
+        private Vector4 UV2OffsetScale(Vector4 uv)
+        {
+            var os = new Vector4
+            {
+                // offset
+                x = uv.x,
+                y = 0,
+                // scale
+                z = uv.z - uv.x,
+                w = uv.w
+            };
+
+            return os;
+        }
+        
         #endregion
     }
 }

@@ -3,9 +3,13 @@
 
 实现思路来自：[ZUIRichText](https://github.com/172672672/UGUI-RichText)
 
+GIF解码思路来自：[UnityGif](https://github.com/SleepyLoser/UnityGif) 和 [GIF图解和压缩详解](https://blog.csdn.net/wzy198852/article/details/17266507)
+
 使用的图标来自：
 [阿里图标库大头贴](https://www.iconfont.cn/collections/detail?spm=a313x.collections_index.i1.d9df05512.168b3a81l8GbZU&cid=50743)
 [阿里图标库多彩小植物](https://www.iconfont.cn/collections/detail?spm=a313x.collections_index.i1.d9df05512.675d3a81CPSoFN&cid=50664)
+
+使用的GIF图来自**网络**
 
 支持的富文本标签：
 

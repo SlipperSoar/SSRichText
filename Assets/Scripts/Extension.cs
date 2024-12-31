@@ -5,7 +5,9 @@
  */
 
 using System;
+using System.Collections;
 using System.Collections.Generic;
+using UnityEngine;
 
 namespace SS.UIComponent
 {
@@ -71,7 +73,6 @@ namespace SS.UIComponent
         /// </summary>
         /// <param name="str"></param>
         /// <param name="startIndex"></param>
-        /// <param name="endIndex"></param>
         /// <returns></returns>
         public static string GetSubString(this string str, int startIndex)
         {
@@ -80,6 +81,79 @@ namespace SS.UIComponent
 #else
             return str.Substring(startIndex);
 #endif
+        }
+
+        /// <summary>
+        /// 子数组获取
+        /// </summary>
+        /// <param name="array"></param>
+        /// <param name="startIndex"></param>
+        /// <param name="length"></param>
+        /// <typeparam name="T"></typeparam>
+        /// <returns></returns>
+        public static T[] GetSubArray<T>(this T[] array, int startIndex, int length)
+        {
+#if UNITY_2021_2_OR_NEWER
+            return array[startIndex..(startIndex + length)];
+#else
+            var res = new T[length];
+
+            for (int i = 0; i < length; i++)
+            {
+                res[i] = array[i + startIndex];
+            }
+            
+            return res;
+#endif
+        }
+
+        /// <summary>
+        /// 从bit数组中获取指定长度转换的值（低位在前）
+        /// </summary>
+        /// <param name="bitArray"></param>
+        /// <param name="index">起始索引</param>
+        /// <param name="length">读取长度</param>
+        /// <returns>转换成的值</returns>
+        public static int GetValue(this BitArray bitArray, ref int index, int length)
+        {
+            // 不能超出索引范围，不能超出int范围
+            if (index >= bitArray.Length || length > 32 || index + length > bitArray.Length)
+            {
+                return 0;
+            }
+            
+            var res = 0;
+
+            for (int i = 0; i < length; i++)
+            {
+                // if (index >= bitArray.Length)
+                // {
+                //     return res;
+                // }
+
+                var value = bitArray.Get(index++);
+                res |= value ? (1 << i) : 0;
+            }
+            
+            return res;
+        }
+
+        /// <summary>
+        /// byte转二进制字符串
+        /// </summary>
+        /// <param name="value"></param>
+        /// <returns></returns>
+        public static string ToBinaryString(this byte value)
+        {
+            var chars = new char[8];
+
+            for (int i = 0; i < 8; i++)
+            {
+                chars[8 - i - 1] = ((value >> i) & 1) == 1 ? '1' : '0';
+            }
+            
+            var res = new string(chars);
+            return res;
         }
     }
 }
