@@ -4,7 +4,9 @@
  * @description Unity Text富文本扩展用的RawImage扩展
  */
 
+using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -19,6 +21,7 @@ namespace SS.UIComponent
 
         private List<RichText.RichInfo> _sprites;
         private List<UIVertex[]> _vertices;
+        private Dictionary<RichText.RichInfo, UIVertex[]> _gifs;
         private LinkedList<int> _iconShadows;
         private static readonly int Offset = Shader.PropertyToID("_Offset");
         private static readonly int Scale = Shader.PropertyToID("_Scale");
@@ -26,19 +29,33 @@ namespace SS.UIComponent
         private int textureWidth;
         private int textureHeight;
         private RenderTexture rt;
+        private List<Coroutine> gifCoroutines = new List<Coroutine>();
+        private Material blitMaterial;
 
         #endregion
         
         #region Public Methods
 
-        public void SetIcons(List<RichText.RichInfo> iconInfos, Dictionary<string, Sprite> icons, List<UIVertex[]> vertices, LinkedList<int> iconShadows)
+        public void SetIcons(List<RichText.RichInfo> iconInfos, Dictionary<string, Sprite> icons, List<UIVertex[]> vertices, LinkedList<int> iconShadows, Dictionary<RichText.RichInfo, UIVertex[]> gifs)
         {
             _sprites = iconInfos;
             _vertices = vertices;
             _iconShadows = iconShadows;
-            if (_sprites.Count == 1)
+            _gifs = gifs;
+            // 先把上次的停了（如果有）
+            StopAllGifCoroutines();
+            if (_sprites.Count == 1 && _gifs.Count == 0)
             {
                 texture = icons[_sprites[0].Content].texture;
+            }
+            else if (_sprites.Count == 0 && _gifs.Count == 1)
+            {
+                // 单个动图
+                foreach (var gif in gifs)
+                {
+                    ApplySingleGif(gif.Key.Content, gif.Value);
+                    break;
+                }
             }
             else
             {
@@ -49,6 +66,9 @@ namespace SS.UIComponent
 
         #endregion
         
+        
+        #region unity
+
         protected override void OnPopulateMesh(VertexHelper toFill)
         {
             toFill.Clear();
@@ -78,32 +98,76 @@ namespace SS.UIComponent
                     AddIconTriangle(verts, toFill);
                 }
             }
+            
+            // 这里处理Gif的渲染
+            foreach (var gif in _gifs)
+            {
+                var info = gif.Key;
+                var verts = gif.Value;
+                
+                verts[0].color = color * info.Color;
+                verts[1].color = color * info.Color;
+                verts[2].color = color * info.Color;
+                verts[3].color = color * info.Color;
+
+                if (_iconShadows.Remove(info.StartIndex))
+                {
+                    ApplyIconShadow(verts, toFill);
+                }
+                else
+                {
+                    AddIconTriangle(verts, toFill);
+                }
+            }
         }
+
+        protected override void OnDestroy()
+        {
+            base.OnDestroy();
+            
+            StopAllGifCoroutines();
+        }
+
+        #endregion
 
         #region Private Methods
 
         private RenderTexture CombineSprites(Dictionary<string, Sprite> icons)
         {
-            // 获取所有图标的尺寸
-            var totalWidth = 0;
-            var maxHeight = 0;
+            textureWidth = 0;
+            textureHeight = 0;
+            
+            // 获取所有gif的尺寸
+            foreach (var gif in _gifs)
+            {
+                // 这个方法会进行缓存，下面可以直接调用
+                var gifSize = GifLoadManager.Instance.GetGifSize(gif.Key.Content);
+                textureWidth += gifSize.x;
+                textureHeight = Mathf.Max(textureHeight, gifSize.y);
+            }
 
+            // 获取所有图标的尺寸
             foreach (var kvp in icons)
             {
                 var sprite = kvp.Value;
-                totalWidth += (int)sprite.rect.width;
-                maxHeight = Mathf.Max(maxHeight, (int)sprite.rect.height);
+                textureWidth += (int)sprite.rect.width;
+                textureHeight = Mathf.Max(textureHeight, (int)sprite.rect.height);
             }
             
-            textureWidth = totalWidth;
-            textureHeight = maxHeight;
-            var renderTexture = RenderTexture.GetTemporary(totalWidth, maxHeight);
+            // textureWidth = totalWidth;
+            // textureHeight = maxHeight;
+            var totalWidth = (float)textureWidth;
+            var maxHeight = (float)textureHeight;
+            var renderTexture = RenderTexture.GetTemporary(textureWidth, textureHeight);
             renderTexture.format = RenderTextureFormat.ARGB32;
             var prevRT = RenderTexture.active;
             RenderTexture.active = renderTexture;
             GL.Clear(true, true, Color.clear);
             // Material blitMaterial = new Material(Shader.Find("Custom/TextureCombineUV"));
-            Material blitMaterial = new Material(Shader.Find("Custom/TextureCombineVert"));
+            if (!blitMaterial)
+            {
+                blitMaterial = new Material(Shader.Find("Custom/TextureCombineVert"));
+            }
 
             var iconUvs = new Dictionary<string, Vector4>(icons.Count);
             var index = 0;
@@ -134,7 +198,7 @@ namespace SS.UIComponent
                 
                 // 计算顶点位置偏移和缩放
                 // offset是从左到右的宽度比例
-                Vector2 offset = new Vector2(currentX / (float)totalWidth, 0);
+                Vector2 offset = new Vector2(currentX / totalWidth, 0);
                 Vector2 scale = new Vector2(spriteRect.width / totalWidth, spriteRect.height / maxHeight);
                 
                 blitMaterial.SetVector(Offset, offset);
@@ -155,9 +219,44 @@ namespace SS.UIComponent
                 verts[2].uv0 = new Vector2(uv.z, uv.y);
                 verts[3].uv0 = new Vector2(uv.x, uv.y);
             }
+            
+            var gifUvs = new Dictionary<string, Vector4>(_gifs.Count);
+            foreach (var kvp in _gifs)
+            {
+                var gifName = kvp.Key.Content;
+                var gifSize = GifLoadManager.Instance.GetGifSize(gifName);
+                var uv = new Vector4(currentX / totalWidth, 0,
+                    (gifSize.x + currentX) / totalWidth, gifSize.y / maxHeight);
+                gifUvs.TryAddToDictionary(gifName, uv);
+                currentX += gifSize.x; // 更新x坐标
+            }
+
+            foreach (var gif in _gifs)
+            {
+                var uv = gifUvs[gif.Key.Content];
+                var verts = gif.Value;
+                // uv是x y左下， z w右上，但这里顶点实际上是从左上开始的顺时针
+                verts[0].uv0 = new Vector2(uv.x, uv.w);
+                verts[1].uv0 = new Vector2(uv.z, uv.w);
+                verts[2].uv0 = new Vector2(uv.z, uv.y);
+                verts[3].uv0 = new Vector2(uv.x, uv.y);
+                
+                GifLoadManager.Instance.LoadGif(gif.Key.Content, frames =>
+                {
+                    gifCoroutines.Add(StartCoroutine(PlayGif(gif.Key, frames)));
+                });
+            }
 
             RenderTexture.active = prevRT;
             return renderTexture;
+        }
+
+        private void ApplySingleGif(string gifName, UIVertex[] vertices)
+        {
+            GifLoadManager.Instance.LoadGif(gifName, frames =>
+            {
+                gifCoroutines.Add(StartCoroutine(PlaySingleGif(frames)));
+            });
         }
 
         private void ApplyIconShadow(UIVertex[] verts, VertexHelper toFill)
@@ -237,6 +336,115 @@ namespace SS.UIComponent
             return os;
         }
         
+        /// <summary>
+        /// 将uv通过数学关系转换为偏移和缩放（不含rect，即默认0偏移）
+        /// </summary>
+        /// <param name="uvX">图像的uv的x</param>
+        /// <param name="uvY">图像的uv的y</param>
+        /// <param name="uvZ">图像的uv的z</param>
+        /// <param name="uvW">图像的uv的w</param>
+        /// <returns>图像的渲染偏移和缩放，offset=(x, y)，scale=(z, w)</returns>
+        private Vector4 UV2OffsetScale(float uvX, float uvY, float uvZ, float uvW)
+        {
+            var os = new Vector4
+            {
+                // offset
+                x = uvX,
+                y = 0,
+                // scale
+                z = uvZ - uvX,
+                w = uvW
+            };
+
+            return os;
+        }
+
+        private void StopAllGifCoroutines()
+        {
+            if (gifCoroutines.Count > 0)
+            {
+                foreach (var gifCoroutine in gifCoroutines)
+                {
+                    StopCoroutine(gifCoroutine);
+                }
+            }
+            
+            gifCoroutines.Clear();
+        }
+        
+        #endregion
+        
+        #region Coroutine
+
+        IEnumerator PlaySingleGif(List<GifData> frames)
+        {
+            var index = 1;
+            var countDown = 0f;
+        
+            texture = frames[0].FrameTexture;
+        
+            while (true)
+            {
+                if (index >= frames.Count)
+                {
+                    index %= frames.Count;
+                }
+            
+                var frame = frames[index];
+                if (countDown >= frame.DelaySecond)
+                {
+                    texture = frame.FrameTexture;
+                    countDown -= frame.DelaySecond;
+                    index++;
+                }
+            
+                countDown += Time.deltaTime;
+            
+                yield return null;
+            }
+        }
+        
+        IEnumerator PlayGif(RichText.RichInfo gifInfo, List<GifData> frames)
+        {
+            var index = 1;
+            var countDown = 0f;
+
+            var verts = _gifs[gifInfo];
+            var offsetScale = UV2OffsetScale(verts[3].uv0.x, verts[3].uv0.y, verts[1].uv0.x, verts[1].uv0.y);
+            
+#if UNITY_EDITOR
+            Debug.Log($"Play Gif: {gifInfo.Content}, offset and scale: {offsetScale}");
+#endif
+            
+            var offset = new Vector2(offsetScale.x, offsetScale.y);
+            var scale = new Vector2(offsetScale.z, offsetScale.w);
+            blitMaterial.SetVector(Offset, offset);
+            blitMaterial.SetVector(Scale, scale);
+            Graphics.Blit(frames[0].FrameTexture, rt, blitMaterial);
+        
+            while (true)
+            {
+                if (index >= frames.Count)
+                {
+                    index %= frames.Count;
+                }
+            
+                var frame = frames[index];
+                if (countDown >= frame.DelaySecond)
+                {
+                    blitMaterial.SetVector(Offset, offset);
+                    blitMaterial.SetVector(Scale, scale);
+                    Graphics.Blit(frame.FrameTexture, rt, blitMaterial);
+                    countDown -= frame.DelaySecond;
+                    index++;
+                }
+            
+                countDown += Time.deltaTime;
+            
+                yield return null;
+            }
+        }
+
         #endregion
     }
 }

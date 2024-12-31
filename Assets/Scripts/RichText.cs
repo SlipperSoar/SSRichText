@@ -47,6 +47,8 @@ namespace SS.UIComponent
             Link,
             /// <summary>图标</summary>
             Icon,
+            /// <summary>Gif动图</summary>
+            Gif,
         }
         
         private class TagInfo
@@ -155,12 +157,15 @@ namespace SS.UIComponent
         private readonly Regex UnderlineRegex = new Regex(UnderlineRegexText);
         private readonly Regex UnderlineEndRegex = new Regex(UnderlineEndRegexText);
         
-        // link（用下划线实现）
+        // link
         // private static readonly string LinkRegexText = @"<link=([a-zA-z]+://[^\s]*?)>";
         private static readonly string LinkRegexText = @"<link=([a-zA-Z][a-zA-Z0-9+\-.]*://[^\s>]+)>";
         private const string LinkEndRegexText = @"</link>";
         private readonly Regex LinkRegex = new Regex(LinkRegexText);
         private readonly Regex LinkEndRegex = new Regex(LinkEndRegexText);
+        
+        // GIF动图
+        private static readonly Regex GifRegex = new Regex(@"<gif=([a-zA-Z0-9_\-\(\)\.]+)/>");
 
         #endregion
 
@@ -309,6 +314,8 @@ namespace SS.UIComponent
             var iconInfos = new List<RichInfo>();
             var icons = new Dictionary<string, Sprite>();
             var iconVerts = new List<UIVertex[]>();
+            // Gif动图的
+            var gifs = new Dictionary<RichInfo, UIVertex[]>();
             
             // 图标阴影。这个每个元素只用一次就remove，用LinkedList可以避免数组整体移动，也用不着哈希计算
             var iconShadows = new LinkedList<int>();
@@ -330,6 +337,15 @@ namespace SS.UIComponent
                             iconInfos.Add(richInfo);
                             icons.TryAddToDictionary(richInfo.Content, icon.icon);
                             iconVerts.Add(icon.verts);
+                        }
+                    }
+                        break;
+                    case RichType.Gif:
+                    {
+                        var gifVerts = ApplyGif(richInfo, verts, vertCount);
+                        if (gifVerts != null)
+                        {
+                            gifs.Add(richInfo, gifVerts);
                         }
                     }
                         break;
@@ -421,6 +437,18 @@ namespace SS.UIComponent
                         tempVerts[j].position.y += roundingOffset.y;
                     }
                 }
+
+                foreach (var gif in gifs)
+                {
+                    var tempVerts = gif.Value;
+                    
+                    for (int j = 0; j < 4; j++)
+                    {
+                        tempVerts[j].position *= unitsPerPixel;
+                        tempVerts[j].position.x += roundingOffset.x;
+                        tempVerts[j].position.y += roundingOffset.y;
+                    }
+                }
             }
             else
             {
@@ -442,12 +470,22 @@ namespace SS.UIComponent
                         tempVerts[j].position *= unitsPerPixel;
                     }
                 }
+                
+                foreach (var gif in gifs)
+                {
+                    var tempVerts = gif.Value;
+                    
+                    for (int j = 0; j < 4; j++)
+                    {
+                        tempVerts[j].position *= unitsPerPixel;
+                    }
+                }
             }
 
             // 计算完把下划线用的uv清掉
             underlineUVs = null;
             // 避免同时更新渲染
-            StartCoroutine(CallIconUpdate(iconInfos, icons, iconVerts, iconShadows));
+            StartCoroutine(CallIconUpdate(iconInfos, icons, iconVerts, iconShadows, gifs));
 
             m_DisableFontTextureRebuiltCallback = false;
         }
@@ -479,6 +517,7 @@ namespace SS.UIComponent
                 {
                     case RichType.Link:
                     case RichType.Icon:
+                    case RichType.Gif:
                         message = target.Content;
                         break;
                     default:
@@ -521,6 +560,13 @@ namespace SS.UIComponent
             
             // 图标
             tags.AddRange(GetTags(resultText, IconRegex, RichType.Icon, true, (str, info) =>
+            {
+                info.Content = str;
+                info.Color = Color.white;
+            }));
+            
+            // Gif动图
+            tags.AddRange(GetTags(resultText, GifRegex, RichType.Gif, true, (str, info) =>
             {
                 info.Content = str;
                 info.Color = Color.white;
@@ -614,6 +660,21 @@ namespace SS.UIComponent
                         // subStrPairs.Add((tag.Index, tag.Length));
                         continue;
                     }
+                    // Gif同理，特殊处理
+                    else if (tag.Type == RichType.Gif)
+                    {
+                        richInfos.Add(new RichInfo()
+                        {
+                            Type = RichType.Gif,
+                            Content = tag.Content,
+                            StartIndex = tag.Index - offset,
+                            EndIndex = tag.Index - offset + 1,
+                            Color = tag.Color,
+                        });
+                        
+                        offset += tag.Length - 1;
+                        continue;
+                    }
 
                     if (tagStack.Count == 0)
                     {
@@ -696,9 +757,11 @@ namespace SS.UIComponent
 
             // 可以保证有嵌套size的情况下可以生成正确的顶点
             resultText = IconRegex.Replace(resultText, IconReplaceChar);
+            resultText = GifRegex.Replace(resultText, IconReplaceChar);
 
             // temp去掉white space
             textWithoutTag = IconRegex.Replace(textWithoutTag, IconReplaceChar);
+            textWithoutTag = GifRegex.Replace(textWithoutTag, IconReplaceChar);
             textWithoutTag = WhiteSpaceRegex.Replace(textWithoutTag, "");
 
             foreach (var richInfo in richInfos)
@@ -897,7 +960,7 @@ namespace SS.UIComponent
 
                 // 整理图标
                 var iconVert = vert;
-                vert.color.a = 255;
+                iconVert.color.a = 255;
                 iconVerts[i - start] = iconVert;
             }
 
@@ -910,6 +973,52 @@ namespace SS.UIComponent
             return (iconSprite, iconVerts);
         }
 
+        /// <summary>
+        /// 图标效果
+        /// </summary>
+        private UIVertex[] ApplyGif(RichInfo richInfo, IList<UIVertex> verts, int vertCount)
+        {
+            // 先检查能不能被渲染出来，不能那就算了
+            if (richInfo.StartIndex * 4 >= vertCount)
+            {
+                return null;
+            }
+
+            if (underlineUVs == null || underlineUVs.Length == 0)
+            {
+                underlineUVs = new Vector4[4];
+            }
+            
+            var start = richInfo.StartIndex * 4;
+            var end = start + 4;
+            var gifVerts = new UIVertex[4];
+            // 图标一定是单个字符，这里把uv收缩50%应该会很合适
+            // index + 2 一定是对角
+            var vert1 = verts[start];
+            var vert2 = verts[start + 2];
+            var uvCenterX = (vert1.uv0.x + vert2.uv0.x) / 2;
+            var uvCenterY = (vert1.uv0.y + vert2.uv0.y) / 2;
+            for (int i = start; i < end; i++)
+            {
+                // 将原字符设置为透明
+                var vert = verts[i];
+                vert.color.a = 0;
+                var uv = vert.uv0;
+                uv.x = (uv.x + uvCenterX) / 2;
+                uv.y = (uv.y + uvCenterY) / 2;
+                vert.uv0 = uv;
+                verts[i] = vert;
+                underlineUVs[i - start] = uv;
+
+                // 整理图标
+                var iconVert = vert;
+                iconVert.color.a = 255;
+                gifVerts[i - start] = iconVert;
+            }
+            
+            return gifVerts;
+        }
+        
         /// <summary>
         /// 下划线效果
         /// </summary>
@@ -1102,15 +1211,15 @@ namespace SS.UIComponent
 
         #region Coroutine
 
-        private IEnumerator CallIconUpdate(List<RichInfo> iconInfos, Dictionary<string, Sprite> icons, List<UIVertex[]> vertices, LinkedList<int> iconShadows)
+        private IEnumerator CallIconUpdate(List<RichInfo> iconInfos, Dictionary<string, Sprite> icons, List<UIVertex[]> vertices, LinkedList<int> iconShadows, Dictionary<RichInfo, UIVertex[]> gifs)
         {
             yield return null;
             // 处理图标
-            var needShowIcons = iconInfos.Count > 0;
+            var needShowIcons = iconInfos.Count > 0 || gifs.Count > 0;
             iconImage.gameObject.SetActive(needShowIcons);
             if (needShowIcons)
             {
-                iconImage.SetIcons(iconInfos, icons, vertices, iconShadows);
+                iconImage.SetIcons(iconInfos, icons, vertices, iconShadows, gifs);
             }
         }
 

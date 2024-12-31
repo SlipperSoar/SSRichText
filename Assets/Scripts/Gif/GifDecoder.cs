@@ -232,6 +232,28 @@ namespace SS.UIComponent
         public const int MAX_CODE_TABLE_SIZE = 1 << MAX_BIT_CODE_COUNT;
 
         #endregion
+
+        public static Vector2Int GetGifSize(byte[] bytes)
+        {
+            // Header一定是GIF
+            if (bytes[0] != 'G' || bytes[1] != 'I' || bytes[2] != 'F')
+            {
+#if UNITY_EDITOR
+                Debug.LogError($"This is not a GIF!");
+#endif
+                return default;
+            }
+            
+            var byteIndex = 6;
+            // 逻辑屏幕标识符
+            // 2字节的宽度信息
+            var screenWidth = BitConverter.ToUInt16(bytes, byteIndex);
+            byteIndex += 2;
+            // 2字节的高度信息
+            var screenHeight = BitConverter.ToUInt16(bytes, byteIndex);
+            
+            return new Vector2Int(screenWidth, screenHeight);
+        }
         
         /// <summary>
         /// 解码GIF

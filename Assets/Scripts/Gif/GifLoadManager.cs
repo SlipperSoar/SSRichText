@@ -28,8 +28,12 @@ namespace SS.UIComponent
             {
                 if (_instance == null)
                 {
-                    _instance = new GameObject("GifLoadManager").AddComponent<GifLoadManager>();
-                    DontDestroyOnLoad(_instance.gameObject);
+                    _instance = FindObjectOfType<GifLoadManager>();
+                    if (_instance == null)
+                    {
+                        _instance = new GameObject("GifLoadManager").AddComponent<GifLoadManager>();
+                        DontDestroyOnLoad(_instance.gameObject);
+                    }
                 }
 
                 return _instance;
@@ -49,18 +53,13 @@ namespace SS.UIComponent
         
         #region properties
 
-        private Dictionary<string, bool> gifLoadStatus;
-        private Dictionary<string, GifLoadData> gifDatas;
+        private Dictionary<string, bool> gifLoadStatus = new Dictionary<string, bool>();
+        private Dictionary<string, GifLoadData> gifDatas = new Dictionary<string, GifLoadData>();
+        private Dictionary<string, Vector2Int> gifSizes = new Dictionary<string, Vector2Int>();
 
         #endregion
 
         #region Unity
-
-        private void Awake()
-        {
-            gifDatas = new Dictionary<string, GifLoadData>();
-            gifLoadStatus = new Dictionary<string, bool>();
-        }
 
         private void Update()
         {
@@ -78,6 +77,7 @@ namespace SS.UIComponent
             {
                 gifLoadStatus.Remove(gifName);
                 gifDatas.Remove(gifName);
+                gifSizes.Remove(gifName);
             }
         }
 
@@ -85,7 +85,35 @@ namespace SS.UIComponent
         
         #region Public Methods
 
-        public void LoadGif(string gifName, bool useIO, Action<List<GifData>> onComplete)
+        /// <summary>
+        /// 获取GIF的显示尺寸
+        /// </summary>
+        /// <param name="gifName">gif资源名或路径</param>
+        /// <param name="useIO">是否使用IO（路径）</param>
+        /// <returns></returns>
+        public Vector2Int GetGifSize(string gifName, bool useIO = false)
+        {
+            if (gifSizes.TryGetValue(gifName, out var size))
+            {
+                return size;
+            }
+
+            byte[] bytes = null;
+            if (useIO)
+            {
+                bytes = System.IO.File.ReadAllBytes(gifName);
+            }
+            else
+            {
+                bytes = Resources.Load<TextAsset>(gifName).bytes;
+            }
+            
+            size = GifDecoder.GetGifSize(bytes);
+            gifSizes.TryAddToDictionary(gifName, size);
+            return size;
+        }
+        
+        public void LoadGif(string gifName, Action<List<GifData>> onComplete, bool useIO = false)
         {
 #if UNITY_EDITOR
             Debug.Log($"Load Gif: {gifName}, useIO: {useIO}");

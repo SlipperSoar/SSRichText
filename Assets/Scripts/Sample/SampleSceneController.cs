@@ -29,10 +29,10 @@ public class SampleSceneController : MonoBehaviour
         };
         
         // 测试gif的解析
-        GifLoadManager.Instance.LoadGif("GIF0", false, frames =>
-        {
-            StartCoroutine(PlayGif(frames));
-        });
+        // GifLoadManager.Instance.LoadGif("GIF0", frames =>
+        // {
+        //     StartCoroutine(PlayGif(frames));
+        // });
     }
 
     IEnumerator PlayGif(List<GifData> frames)

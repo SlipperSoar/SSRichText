@@ -41,8 +41,8 @@ GIF解码思路来自：[UnityGif](https://github.com/SleepyLoser/UnityGif) 和 
 - [x] icon图标标签
 - [x] link标签
 - [x] 富文本点击事件
+- [x] GIF显示在富文本
 - [ ] GIF的文本渲染到帧图上
-- [ ] GIF显示在富文本
 
 # 效果图
 
