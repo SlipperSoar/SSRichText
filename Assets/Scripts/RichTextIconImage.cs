@@ -24,13 +24,12 @@ namespace SS.UIComponent
         private List<UIVertex[]> _vertices;
         private Dictionary<RichInfo, UIVertex[]> _gifs;
         private LinkedList<int> _iconShadows;
-        private static readonly int Offset = Shader.PropertyToID("_Offset");
-        private static readonly int Scale = Shader.PropertyToID("_Scale");
+        private static readonly int OffsetScale = Shader.PropertyToID("_OffsetScale");
 
         private int textureWidth;
         private int textureHeight;
         private RenderTexture rt;
-        private Dictionary<RichInfo, Coroutine> gifCoroutines = new();
+        private Dictionary<string, Coroutine> gifCoroutines = new();
         private Material blitMaterial;
 
         #endregion
@@ -138,11 +137,18 @@ namespace SS.UIComponent
             textureWidth = 0;
             textureHeight = 0;
             
-            // 获取所有gif的尺寸
+            // gif去重
+            var gifUvs = new Dictionary<string, Vector4>(_gifs.Count);
             foreach (var gif in _gifs)
             {
+                gifUvs.TryAddToDictionary(gif.Key.Content, Vector4.zero);
+            }
+            
+            // 获取所有gif的尺寸
+            foreach (var gif in gifUvs)
+            {
                 // 这个方法会进行缓存，下面可以直接调用
-                var gifSize = GifLoadManager.Instance.GetGifSize(gif.Key.Content);
+                var gifSize = GifLoadManager.Instance.GetGifSize(gif.Key);
                 textureWidth += gifSize.x;
                 textureHeight = Mathf.Max(textureHeight, gifSize.y);
             }
@@ -199,11 +205,9 @@ namespace SS.UIComponent
                 
                 // 计算顶点位置偏移和缩放
                 // offset是从左到右的宽度比例
-                Vector2 offset = new Vector2(currentX / totalWidth, 0);
-                Vector2 scale = new Vector2(spriteRect.width / totalWidth, spriteRect.height / maxHeight);
+                var offsetScale = new Vector4(currentX / totalWidth, 0, spriteRect.width / totalWidth, spriteRect.height / maxHeight);
                 
-                blitMaterial.SetVector(Offset, offset);
-                blitMaterial.SetVector(Scale, scale);
+                blitMaterial.SetVector(OffsetScale, offsetScale);
                 Graphics.Blit(texture, renderTexture, blitMaterial);
 
                 currentX += (int)spriteRect.width; // 更新x坐标
@@ -220,15 +224,14 @@ namespace SS.UIComponent
                 verts[2].uv0 = new Vector2(uv.z, uv.y);
                 verts[3].uv0 = new Vector2(uv.x, uv.y);
             }
-            
-            var gifUvs = new Dictionary<string, Vector4>(_gifs.Count);
-            foreach (var kvp in _gifs)
+
+            var gifNames = gifUvs.Keys.ToArray();
+            foreach (var gifName in gifNames)
             {
-                var gifName = kvp.Key.Content;
                 var gifSize = GifLoadManager.Instance.GetGifSize(gifName);
                 var uv = new Vector4(currentX / totalWidth, 0,
                     (gifSize.x + currentX) / totalWidth, gifSize.y / maxHeight);
-                gifUvs.TryAddToDictionary(gifName, uv);
+                gifUvs[gifName] = uv;
                 currentX += gifSize.x; // 更新x坐标
             }
 
@@ -241,15 +244,16 @@ namespace SS.UIComponent
                 verts[1].uv0 = new Vector2(uv.z, uv.w);
                 verts[2].uv0 = new Vector2(uv.z, uv.y);
                 verts[3].uv0 = new Vector2(uv.x, uv.y);
-                
-                GifLoadManager.Instance.LoadGif(gif.Key.Content, frames =>
+
+                var gifName = gif.Key.Content;
+                GifLoadManager.Instance.LoadGif(gifName, frames =>
                 {
-                    if (gifCoroutines.ContainsKey(gif.Key))
+                    if (gifCoroutines.ContainsKey(gifName))
                     {
                         return;
                     }
 
-                    gifCoroutines.Add(gif.Key, StartCoroutine(PlayGif(gif.Key, frames)));
+                    gifCoroutines.Add(gifName, StartCoroutine(PlayGif(gif.Key, frames)));
                 });
             }
 
@@ -261,7 +265,7 @@ namespace SS.UIComponent
         {
             GifLoadManager.Instance.LoadGif(richInfo.Content, frames =>
             {
-                gifCoroutines.Add(richInfo, StartCoroutine(PlaySingleGif(frames)));
+                gifCoroutines.Add(richInfo.Content, StartCoroutine(PlaySingleGif(frames)));
             });
         }
 
@@ -421,11 +425,7 @@ namespace SS.UIComponent
 #if UNITY_EDITOR
             Debug.Log($"Play Gif: {gifInfo.Content}, offset and scale: {offsetScale}");
 #endif
-            
-            var offset = new Vector2(offsetScale.x, offsetScale.y);
-            var scale = new Vector2(offsetScale.z, offsetScale.w);
-            blitMaterial.SetVector(Offset, offset);
-            blitMaterial.SetVector(Scale, scale);
+            blitMaterial.SetVector(OffsetScale, offsetScale);
             Graphics.Blit(frames[0].FrameTexture, rt, blitMaterial);
         
             while (true)
@@ -438,8 +438,7 @@ namespace SS.UIComponent
                 var frame = frames[index];
                 if (countDown >= frame.DelaySecond)
                 {
-                    blitMaterial.SetVector(Offset, offset);
-                    blitMaterial.SetVector(Scale, scale);
+                    blitMaterial.SetVector(OffsetScale, offsetScale);
                     Graphics.Blit(frame.FrameTexture, rt, blitMaterial);
                     countDown -= frame.DelaySecond;
                     index++;

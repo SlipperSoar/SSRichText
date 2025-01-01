@@ -10,8 +10,7 @@ Shader "Custom/TextureCombineVert"
 	    _StencilReadMask ("Stencil Read Mask", Float) = 255
 	    _ColorMask ("Color Mask", Float) = 15
         
-        _Offset ("Offset", Vector) = (0,0,0,0)
-        _Scale ("Scale", Vector) = (1,1,1,1)
+        _OffsetScale ("OffsetScale", Vector) = (0,0,1,1)
     }
     SubShader
     {
@@ -49,8 +48,7 @@ Shader "Custom/TextureCombineVert"
 
             sampler2D _MainTex;
             float4 _MainTex_ST;
-            float4 _Offset;
-            float4 _Scale;
+            float4 _OffsetScale;
 
             v2f vert (appdata v)
             {
@@ -59,8 +57,8 @@ Shader "Custom/TextureCombineVert"
                 UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(o);// 实例化处理
                 o.texcoord = TRANSFORM_TEX(v.texcoord, _MainTex);
 
-                v.vertex.x = v.vertex.x * _Scale.x + _Offset.x;
-                v.vertex.y = v.vertex.y * _Scale.y + _Offset.y;
+                v.vertex.x = v.vertex.x * _OffsetScale.z + _OffsetScale.x;
+                v.vertex.y = v.vertex.y * _OffsetScale.w + _OffsetScale.y;
                 o.vertex = UnityObjectToClipPos(v.vertex);
                 return o;
             }
