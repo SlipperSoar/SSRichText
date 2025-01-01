@@ -136,35 +136,15 @@ namespace SS.UIComponent
         {
             textureWidth = 0;
             textureHeight = 0;
-            
-            // gif去重
-            var gifUvs = new Dictionary<string, Vector4>(_gifs.Count);
-            foreach (var gif in _gifs)
-            {
-                gifUvs.TryAddToDictionary(gif.Key.Content, Vector4.zero);
-            }
-            
-            // 获取所有gif的尺寸
-            foreach (var gif in gifUvs)
-            {
-                // 这个方法会进行缓存，下面可以直接调用
-                var gifSize = GifLoadManager.Instance.GetGifSize(gif.Key);
-                textureWidth += gifSize.x;
-                textureHeight = Mathf.Max(textureHeight, gifSize.y);
-            }
 
-            // 获取所有图标的尺寸
-            foreach (var kvp in icons)
-            {
-                var sprite = kvp.Value;
-                textureWidth += (int)sprite.rect.width;
-                textureHeight = Mathf.Max(textureHeight, (int)sprite.rect.height);
-            }
-            
-            // textureWidth = totalWidth;
-            // textureHeight = maxHeight;
+            (textureWidth, textureHeight) =
+                CalcOffsetForCombine(icons, out var iconOffsetSizes, out var gifOffsetSizes);
+#if UNITY_EDITOR
+            Debug.Log($"Texture Size: {textureWidth}x{textureHeight}");
+#endif
             var totalWidth = (float)textureWidth;
-            var maxHeight = (float)textureHeight;
+            var totalHeight = (float)textureHeight;
+            // TODO: 当图超过支持的最大大小时，会创建一个支持的最大大小，需要计算缩放
             var renderTexture = RenderTexture.GetTemporary(textureWidth, textureHeight);
             renderTexture.format = RenderTextureFormat.ARGB32;
             var prevRT = RenderTexture.active;
@@ -177,19 +157,18 @@ namespace SS.UIComponent
             }
 
             var iconUvs = new Dictionary<string, Vector4>(icons.Count);
-            var index = 0;
-            var currentX = 0;
-            foreach (var kvp in icons)
+            foreach (var iconOffsetSize in iconOffsetSizes)
             {
-                var sprite = kvp.Value;
+                var offsetSize = iconOffsetSize.Value;
+                var sprite = icons[iconOffsetSize.Key];
                 var texture = sprite.texture;
                 var spriteRect = sprite.rect;
-
+                
                 // 计算图标的UV坐标
-                var uv = new Vector4((spriteRect.x + currentX) / totalWidth, spriteRect.y / maxHeight,
-                    (spriteRect.width + currentX) / totalWidth, spriteRect.height / maxHeight);
-                iconUvs.TryAddToDictionary(kvp.Key, uv);
-
+                var uv = new Vector4((spriteRect.x + offsetSize.x) / totalWidth, (spriteRect.y + offsetSize.y) / totalHeight,
+                    (offsetSize.z + offsetSize.x) / totalWidth, (offsetSize.w + offsetSize.y) / totalHeight);
+                iconUvs.TryAddToDictionary(iconOffsetSize.Key, uv);
+                
                 // 计算 UV 偏移和缩放
                 // 偏移和缩放均是指将texture的uv映射到renderTexture上，也就是计算rt（renderTexture）的uv对应的texture的uv值
                 // texture的原始uv是[0, 1]，原封不动（scale = 1）时会铺满rt
@@ -205,12 +184,19 @@ namespace SS.UIComponent
                 
                 // 计算顶点位置偏移和缩放
                 // offset是从左到右的宽度比例
-                var offsetScale = new Vector4(currentX / totalWidth, 0, spriteRect.width / totalWidth, spriteRect.height / maxHeight);
-                
+                var offsetScale = new Vector4(offsetSize.x / totalWidth, offsetSize.y / totalHeight, offsetSize.z / totalWidth, offsetSize.w / totalHeight);
                 blitMaterial.SetVector(OffsetScale, offsetScale);
                 Graphics.Blit(texture, renderTexture, blitMaterial);
+            }
 
-                currentX += (int)spriteRect.width; // 更新x坐标
+            var gifUvs = new Dictionary<string, Vector4>(gifOffsetSizes.Count);
+            foreach (var gifOffsetSize in gifOffsetSizes)
+            {
+                var offsetSize = gifOffsetSize.Value;
+                // 计算图标的UV坐标
+                var uv = new Vector4(offsetSize.x / totalWidth, offsetSize.y / totalHeight,
+                    (offsetSize.z + offsetSize.x) / totalWidth, (offsetSize.w + offsetSize.y) / totalHeight);
+                gifUvs.TryAddToDictionary(gifOffsetSize.Key, uv);
             }
 
             for (int i = 0; i < _sprites.Count; i++)
@@ -225,21 +211,10 @@ namespace SS.UIComponent
                 verts[3].uv0 = new Vector2(uv.x, uv.y);
             }
 
-            var gifNames = gifUvs.Keys.ToArray();
-            foreach (var gifName in gifNames)
-            {
-                var gifSize = GifLoadManager.Instance.GetGifSize(gifName);
-                var uv = new Vector4(currentX / totalWidth, 0,
-                    (gifSize.x + currentX) / totalWidth, gifSize.y / maxHeight);
-                gifUvs[gifName] = uv;
-                currentX += gifSize.x; // 更新x坐标
-            }
-
             foreach (var gif in _gifs)
             {
                 var uv = gifUvs[gif.Key.Content];
                 var verts = gif.Value;
-                // uv是x y左下， z w右上，但这里顶点实际上是从左上开始的顺时针
                 verts[0].uv0 = new Vector2(uv.x, uv.w);
                 verts[1].uv0 = new Vector2(uv.z, uv.w);
                 verts[2].uv0 = new Vector2(uv.z, uv.y);
@@ -261,6 +236,203 @@ namespace SS.UIComponent
             return renderTexture;
         }
 
+        /// <summary>
+        /// 计算图像拼接时的偏移
+        /// </summary>
+        /// <param name="icons">所有的图标</param>
+        /// <param name="iconOffsetSizes">图标的偏移+尺寸信息</param>
+        /// <param name="gifOffsetSizes">gif的偏移+尺寸信息</param>
+        /// <returns>图像的宽高</returns>
+        private (int width, int height) CalcOffsetForCombine(Dictionary<string, Sprite> icons, out Dictionary<string, Vector4> iconOffsetSizes, out Dictionary<string, Vector4> gifOffsetSizes)
+        {
+            // 主要是担心icon和gif会存在重名，所以分开处理
+            iconOffsetSizes = new(icons.Count);
+            gifOffsetSizes = new(_gifs.Count);
+
+            if (icons.Count == 0 && _gifs.Count == 0)
+            {
+#if UNITY_EDITOR
+                Debug.Log($"Dont has icons and gifs");
+#endif
+                return (0, 0);
+            }
+            
+            var totalWidth = 0;
+            var maxHeight = 0;
+            
+            // 首先对gif进行去重+初始化
+            foreach (var gif in _gifs)
+            {
+                var gifSize = GifLoadManager.Instance.GetGifSize(gif.Key.Content);
+                gifOffsetSizes.TryAddToDictionary(gif.Key.Content, new Vector4(0, 0, gifSize.x, gifSize.y));
+                totalWidth += gifSize.x;
+                maxHeight = Mathf.Max(maxHeight, gifSize.y);
+            }
+
+            // 然后对icon进行初始化
+            foreach (var icon in icons)
+            {
+                var width = icon.Value.rect.width;
+                var height = icon.Value.rect.height;
+                iconOffsetSizes.TryAddToDictionary(icon.Key, new Vector4(0, 0, width, height));
+                totalWidth += (int)width;
+                maxHeight = Mathf.Max(maxHeight, (int)height);
+            }
+            
+            // 按行拼，计算需要有几行
+            var rowCount = Mathf.Max(1, totalWidth / maxHeight);
+            // n行需要至少有n个图
+            var totalCount = iconOffsetSizes.Count + gifOffsetSizes.Count;
+            if (totalCount < rowCount)
+            {
+                rowCount = totalCount;
+            }
+
+            // 先按照图像宽度排序，true=icon，false=gif
+            var sortedIndexes = new LinkedList<(bool, string, Vector4)>();
+            // 先拿icon排序
+            foreach (var offsetSize in iconOffsetSizes)
+            {
+                if (sortedIndexes.Count == 0)
+                {
+                    sortedIndexes.AddFirst((true, offsetSize.Key, offsetSize.Value));
+                }
+                else
+                {
+                    var node = sortedIndexes.First;
+                    bool isAdded = false;
+                    do
+                    {
+                        if (node.Value.Item3.z < offsetSize.Value.z)
+                        {
+                            sortedIndexes.AddBefore(node, (true, offsetSize.Key, offsetSize.Value));
+                            isAdded = true;
+                            break;
+                        }
+                        else
+                        {
+                            node = node.Next;
+                        }
+                    } while (node != null);
+
+                    if (!isAdded)
+                    {
+                        sortedIndexes.AddLast((true, offsetSize.Key, offsetSize.Value));
+                    }
+                }
+            }
+            
+            // 再拿gif排序
+            foreach (var offsetSize in gifOffsetSizes)
+            {
+                if (sortedIndexes.Count == 0)
+                {
+                    sortedIndexes.AddFirst((false, offsetSize.Key, offsetSize.Value));
+                }
+                else
+                {
+                    var node = sortedIndexes.First;
+                    bool isAdded = false;
+                    do
+                    {
+                        if (node.Value.Item3.z < offsetSize.Value.z)
+                        {
+                            sortedIndexes.AddBefore(node, (false, offsetSize.Key, offsetSize.Value));
+                            isAdded = true;
+                            break;
+                        }
+                        else
+                        {
+                            node = node.Next;
+                        }
+                    } while (node != null);
+                    
+                    if (!isAdded)
+                    {
+                        sortedIndexes.AddLast((false, offsetSize.Key, offsetSize.Value));
+                    }
+                }
+            }
+            
+            // 合并计算位置
+            var totalHeight = 0;
+            totalWidth = 0;
+            {
+                // 每行的当前偏移(x y 当前行最高高度)
+                var offsets = new Vector3[rowCount];
+                // 先计算每一行的x偏移和当前行最高高度
+                var currentRow = 0;
+                var node = sortedIndexes.First;
+                do
+                {
+                    var offset = offsets[currentRow];
+                    var nodeValue = node.Value;
+                    if (nodeValue.Item1)
+                    {
+                        var offsetSize = iconOffsetSizes[nodeValue.Item2];
+                        offsetSize.x = offset.x;
+                        iconOffsetSizes[nodeValue.Item2] = offsetSize;
+                        // 更新x偏移
+                        offset.x += offsetSize.z;
+                        offset.z = Mathf.Max(offset.z, offsetSize.w);
+                        offsets[currentRow] = offset;
+                        totalWidth = Mathf.Max(totalWidth, (int)offset.x);
+                    }
+                    else
+                    {
+                        var offsetSize = gifOffsetSizes[nodeValue.Item2];
+                        offsetSize.x = offset.x;
+                        gifOffsetSizes[nodeValue.Item2] = offsetSize;
+                        // 更新x偏移
+                        offset.x += offsetSize.z;
+                        offset.z = Mathf.Max(offset.z, offsetSize.w);
+                        offsets[currentRow] = offset;
+                        totalWidth = Mathf.Max(totalWidth, (int)offset.x);
+                    }
+
+                    currentRow = (currentRow + 1) % rowCount;
+                    node = node.Next;
+                } while (node != null);
+
+                // 再计算y偏移
+                for (int i = 1; i < offsets.Length; i++)
+                {
+                    var offset = offsets[i];
+                    var lastOffset = offsets[i - 1];
+                    offset.y = lastOffset.y + lastOffset.z;
+                    offsets[i] = offset;
+                }
+                
+                currentRow = 0;
+                node = sortedIndexes.First;
+                do
+                {
+                    var offset = offsets[currentRow];
+                    var nodeValue = node.Value;
+                    if (nodeValue.Item1)
+                    {
+                        var offsetSize = iconOffsetSizes[nodeValue.Item2];
+                        offsetSize.y = offset.y;
+                        iconOffsetSizes[nodeValue.Item2] = offsetSize;
+                    }
+                    else
+                    {
+                        var offsetSize = gifOffsetSizes[nodeValue.Item2];
+                        offsetSize.y = offset.y;
+                        gifOffsetSizes[nodeValue.Item2] = offsetSize;
+                    }
+
+                    currentRow = (currentRow + 1) % rowCount;
+                    node = node.Next;
+                } while (node != null);
+                
+                var topRowOffset = offsets[rowCount - 1];
+                totalHeight = (int)(topRowOffset.y + topRowOffset.z);
+            }
+
+            return (totalWidth, totalHeight);
+        }
+        
         private void ApplySingleGif(RichInfo richInfo, UIVertex[] vertices)
         {
             GifLoadManager.Instance.LoadGif(richInfo.Content, frames =>
@@ -317,10 +489,10 @@ namespace SS.UIComponent
             {
                 // offset
                 x = uv.x - rect.x / textureWidth,
-                y = 0,
+                y = uv.y - rect.y / textureHeight,
                 // scale
                 z = uv.z - uv.x + rect.x / textureWidth,
-                w = uv.w
+                w = uv.w - uv.y + rect.y / textureHeight
             };
 
             return os;
@@ -337,10 +509,10 @@ namespace SS.UIComponent
             {
                 // offset
                 x = uv.x,
-                y = 0,
+                y = uv.y,
                 // scale
                 z = uv.z - uv.x,
-                w = uv.w
+                w = uv.w - uv.y
             };
 
             return os;
@@ -360,10 +532,10 @@ namespace SS.UIComponent
             {
                 // offset
                 x = uvX,
-                y = 0,
+                y = uvY,
                 // scale
                 z = uvZ - uvX,
-                w = uvW
+                w = uvW - uvY
             };
 
             return os;
@@ -421,7 +593,6 @@ namespace SS.UIComponent
 
             var verts = _gifs[gifInfo];
             var offsetScale = UV2OffsetScale(verts[3].uv0.x, verts[3].uv0.y, verts[1].uv0.x, verts[1].uv0.y);
-            
 #if UNITY_EDITOR
             Debug.Log($"Play Gif: {gifInfo.Content}, offset and scale: {offsetScale}");
 #endif
