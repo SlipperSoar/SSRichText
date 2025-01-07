@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -34,6 +35,8 @@ namespace SS.UIComponent
                         _instance = new GameObject("GifLoadManager").AddComponent<GifLoadManager>();
                         DontDestroyOnLoad(_instance.gameObject);
                     }
+
+                    _instance.InitQueueCheck();
                 }
 
                 return _instance;
@@ -49,6 +52,9 @@ namespace SS.UIComponent
         /// <summary>Gif数据卸载倒计时（秒）</summary>
         private const int UNLOAD_COUNT_DOWN_SECOND = 120;
 
+        /// <summary>最大同时加载数量，避免一次性加载太多导致卡顿（即使是协程）</summary>
+        private const int LOAD_MAX_COUNT = 2;
+
         #endregion
         
         #region properties
@@ -56,6 +62,10 @@ namespace SS.UIComponent
         private Dictionary<string, bool> gifLoadStatus = new Dictionary<string, bool>();
         private Dictionary<string, GifLoadData> gifDatas = new Dictionary<string, GifLoadData>();
         private Dictionary<string, Vector2Int> gifSizes = new Dictionary<string, Vector2Int>();
+
+        private int loadingCount = 0;
+        private Queue<(string gifName, bool useIO, bool forceBgColorTransparent)> waitingQueue = new Queue<(string, bool, bool)>();
+        private Coroutine queueChecker;
 
         #endregion
 
@@ -138,24 +148,70 @@ namespace SS.UIComponent
                 {
                     OnComplete = onComplete
                 };
-                byte[] bytes = null;
-                if (useIO)
+                gifLoadStatus[gifName] = false;
+                
+                // 检查数量，超过最大同时加载数量时放入队列等待
+                if (loadingCount >= LOAD_MAX_COUNT)
                 {
-                    bytes = System.IO.File.ReadAllBytes(gifName);
+                    // 等待
+                    waitingQueue.Enqueue((gifName, useIO, forceBgColorTransparent));
                 }
                 else
                 {
-                    bytes = Resources.Load<TextAsset>(gifName).bytes;
+                    LoadGif(gifName, useIO, forceBgColorTransparent);
                 }
+            }
+        }
+
+        #endregion
+
+        #region Private Methods
+
+        private void InitQueueCheck()
+        {
+            if (queueChecker != null)
+            {
+                StopCoroutine(queueChecker);
+            }
+
+            queueChecker = StartCoroutine(CheckLoadingQueue());
+        }
+        
+        private void LoadGif(string gifName, bool useIO, bool forceBgColorTransparent)
+        {
+            loadingCount++;
+            byte[] bytes = null;
+            if (useIO)
+            {
+                bytes = System.IO.File.ReadAllBytes(gifName);
+            }
+            else
+            {
+                bytes = Resources.Load<TextAsset>(gifName).bytes;
+            }
                 
-                StartCoroutine(GifDecoder.Decode(bytes, gifData =>
+            StartCoroutine(GifDecoder.Decode(bytes, gifData =>
+            {
+                gifLoadStatus[gifName] = true;
+                var loadData = gifDatas[gifName];
+                loadData.Data = gifData;
+                loadData.OnComplete?.Invoke(gifData);
+                loadData.OnComplete = null;
+                loadingCount--;
+            }, forceBgColorTransparent: forceBgColorTransparent));
+        }
+
+        private IEnumerator CheckLoadingQueue()
+        {
+            while (true)
+            {
+                // 检查等待队列
+                if (loadingCount < LOAD_MAX_COUNT && waitingQueue.Count > 0)
                 {
-                    gifLoadStatus[gifName] = true;
-                    var loadData = gifDatas[gifName];
-                    loadData.Data = gifData;
-                    loadData.OnComplete?.Invoke(gifData);
-                    loadData.OnComplete = null;
-                }, forceBgColorTransparent: forceBgColorTransparent));
+                    var (gifName, useIO, forceBgColorTransparent) = waitingQueue.Dequeue();
+                    LoadGif(gifName, useIO, forceBgColorTransparent);
+                }
+                yield return null;
             }
         }
 
