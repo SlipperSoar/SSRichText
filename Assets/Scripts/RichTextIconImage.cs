@@ -66,7 +66,6 @@ namespace SS.UIComponent
 
         #endregion
         
-        
         #region unity
 
         protected override void OnPopulateMesh(VertexHelper toFill)

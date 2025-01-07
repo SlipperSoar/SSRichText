@@ -260,8 +260,9 @@ namespace SS.UIComponent
         /// </summary>
         /// <param name="bytes">Gif文件的字节数据</param>
         /// <param name="onComplete">解码完成的回调，参数为帧数据</param>
+        /// <param name="forceBgColorTransparent">强制背景色透明</param>
         /// <returns>迭代器，可用于协程，避免主线程阻塞</returns>
-        public static IEnumerator Decode(byte[] bytes, Action<List<GifData>> onComplete)
+        public static IEnumerator Decode(byte[] bytes, Action<List<GifData>> onComplete, bool forceBgColorTransparent = false)
         {
             var frames = new List<GifData>();
             var byteIndex = 0;
@@ -329,8 +330,12 @@ namespace SS.UIComponent
                 }
 
                 bgColor = globalColorTable[backgroundColorIndex];
+                if (forceBgColorTransparent)
+                {
+                    bgColor.a = 0;
+                }
 #if UNITY_EDITOR
-                Debug.Log($"GlobalColorTable Length: {globalColorTable.Length}, background color: {globalColorTable[backgroundColorIndex]}");
+                Debug.Log($"GlobalColorTable Length: {globalColorTable.Length}, background color: {bgColor}");
 #endif
             }
 

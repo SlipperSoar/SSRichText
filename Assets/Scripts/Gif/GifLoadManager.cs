@@ -113,10 +113,10 @@ namespace SS.UIComponent
             return size;
         }
         
-        public void LoadGif(string gifName, Action<List<GifData>> onComplete, bool useIO = false)
+        public void LoadGif(string gifName, Action<List<GifData>> onComplete, bool useIO = false, bool forceBgColorTransparent = false)
         {
 #if UNITY_EDITOR
-            Debug.Log($"Load Gif: {gifName}, useIO: {useIO}");
+            Debug.Log($"Load Gif: {gifName}, useIO: {useIO}, forceBgColorTransparent: {forceBgColorTransparent}");
 #endif
             if (gifLoadStatus.TryGetValue(gifName, out var isLoaded))
             {
@@ -155,7 +155,7 @@ namespace SS.UIComponent
                     loadData.Data = gifData;
                     loadData.OnComplete?.Invoke(gifData);
                     loadData.OnComplete = null;
-                }));
+                }, forceBgColorTransparent: forceBgColorTransparent));
             }
         }
 
