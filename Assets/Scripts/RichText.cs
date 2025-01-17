@@ -752,9 +752,14 @@ namespace SS.UIComponent
                 
                 // 加上最后的字符串
                 resultStrBuilder.Append(resultText.GetSubString(index));
+                tempStrBuilder.Append(resultText.GetSubString(tempIndex));
 
                 resultText = resultStrBuilder.ToString();
                 textWithoutTag = tempStrBuilder.ToString();
+            }
+            else
+            {
+                textWithoutTag = resultText;
             }
 
             // 可以保证有嵌套size的情况下可以生成正确的顶点
