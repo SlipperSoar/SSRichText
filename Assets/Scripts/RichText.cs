@@ -174,6 +174,8 @@ namespace SS.UIComponent
         readonly UIVertex[] m_TempVerts = new UIVertex[4];
         private float spaceWidth;
 
+        public static IIconProvider GlobalIconProvider = new IconProvider();
+        
         private IIconProvider _iconProvider;
 
         private IIconProvider iconProvider
@@ -182,7 +184,7 @@ namespace SS.UIComponent
             {
                 if (_iconProvider == null)
                 {
-                    _iconProvider = new IconProvider();
+                    _iconProvider = GlobalIconProvider;
                 }
 
                 return _iconProvider;
