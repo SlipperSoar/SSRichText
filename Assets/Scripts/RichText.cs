@@ -274,15 +274,6 @@ namespace SS.UIComponent
         
         #region override
 
-#if UNITY_EDITOR
-        protected override void OnValidate()
-        {
-            base.OnValidate();
-
-            iconProvider = new IconProvider();
-        }
-#endif
-
         protected override void OnPopulateMesh(VertexHelper toFill)
         {
             if (!supportRichText)
