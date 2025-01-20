@@ -400,6 +400,11 @@ namespace SS.UIComponent
             if (vertCount <= 0)
             {
                 toFill.Clear();
+                // 清理icon
+                // 计算完把下划线用的uv清掉
+                underlineUVs = null;
+                // 避免同时更新渲染
+                StartCoroutine(CallIconUpdate(iconInfos, icons, iconVerts, iconShadows, gifs));
                 return;
             }
 
@@ -1218,6 +1223,10 @@ namespace SS.UIComponent
             if (needShowIcons)
             {
                 iconImage.SetIcons(iconInfos, icons, vertices, iconShadows, gifs);
+            }
+            else
+            {
+                iconImage.Clear();
             }
         }
 

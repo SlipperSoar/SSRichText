@@ -46,7 +46,7 @@ namespace SS.UIComponent
             StopAllGifCoroutines();
             if (_sprites.Count == 1 && _gifs.Count == 0)
             {
-                texture = icons[_sprites[0].Content].texture;
+                ApplySingleSprite(icons[_sprites[0].Content].texture);
             }
             else if (_sprites.Count == 0 && _gifs.Count == 1)
             {
@@ -64,6 +64,16 @@ namespace SS.UIComponent
             }
         }
 
+        public void Clear()
+        {
+            _vertices = null;
+            _sprites = null;
+            _gifs = null;
+            _iconShadows = null;
+            StopAllGifCoroutines();
+            SetAllDirty();
+        }
+        
         #endregion
         
         #region unity
@@ -96,6 +106,11 @@ namespace SS.UIComponent
                 {
                     AddIconTriangle(verts, toFill);
                 }
+            }
+
+            if (_gifs == null)
+            {
+                return;
             }
             
             // 这里处理Gif的渲染
@@ -131,6 +146,21 @@ namespace SS.UIComponent
 
         #region Private Methods
 
+        private void ApplySingleSprite(Texture2D texture2D)
+        {
+            foreach (var vertex in _vertices)
+            {
+                // 左上顺时针到左下
+                vertex[0].uv0 = new Vector4(0, 1);
+                vertex[1].uv0 = new Vector4(1, 1);
+                vertex[2].uv0 = new Vector4(1, 0);
+                vertex[3].uv0 = new Vector4(0, 0);
+            }
+
+            texture = texture2D;
+            SetAllDirty();
+        }
+        
         private RenderTexture CombineSprites(Dictionary<string, Sprite> icons)
         {
             textureWidth = 0;
@@ -144,6 +174,7 @@ namespace SS.UIComponent
             var totalWidth = (float)textureWidth;
             var totalHeight = (float)textureHeight;
             // TODO: 当图超过支持的最大大小时，会创建一个支持的最大大小，需要计算缩放
+            // 大概不用计算缩放
             var renderTexture = RenderTexture.GetTemporary(textureWidth, textureHeight);
             renderTexture.format = RenderTextureFormat.ARGB32;
             var prevRT = RenderTexture.active;
@@ -434,6 +465,11 @@ namespace SS.UIComponent
         
         private void ApplySingleGif(RichInfo richInfo, UIVertex[] vertices)
         {
+            // 左上顺时针到左下
+            vertices[0].uv0 = new Vector4(0, 1);
+            vertices[1].uv0 = new Vector4(1, 1);
+            vertices[2].uv0 = new Vector4(1, 0);
+            vertices[3].uv0 = new Vector4(0, 0);
             GifLoadManager.Instance.LoadGif(richInfo.Content, frames =>
             {
                 gifCoroutines.Add(richInfo.Content, StartCoroutine(PlaySingleGif(frames)));
@@ -542,6 +578,11 @@ namespace SS.UIComponent
 
         private void StopAllGifCoroutines()
         {
+            if (gifCoroutines == null)
+            {
+                return;
+            }
+            
             if (gifCoroutines.Count > 0)
             {
                 foreach (var gifCoroutine in gifCoroutines)
