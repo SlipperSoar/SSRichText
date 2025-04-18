@@ -120,49 +120,49 @@ namespace SS.UIComponent
         // 斜体
         private const string ItalicRegexText = @"<i>";
         private const string ItalicEndRegexText = @"</i>";
-        private readonly Regex ItalicRegex = new Regex(ItalicRegexText);
-        private readonly Regex ItalicEndRegex = new Regex(ItalicEndRegexText);
+        private static readonly Regex ItalicRegex = new Regex(ItalicRegexText);
+        private static readonly Regex ItalicEndRegex = new Regex(ItalicEndRegexText);
         // 粗体
         private const string BoldRegexText = @"<b>";
         private const string BoldEndRegexText = @"</b>";
-        private readonly Regex BoldRegex = new Regex(BoldRegexText);
-        private readonly Regex BoldEndRegex = new Regex(BoldEndRegexText);
+        private static readonly Regex BoldRegex = new Regex(BoldRegexText);
+        private static readonly Regex BoldEndRegex = new Regex(BoldEndRegexText);
         // 颜色
         private static string ColorRegexText => @"<color=((#[0-9a-f]{8})|(#[0-9a-f]{6})|(" + GetColorWords() + @"))>";
         private const string ColorEndRegexText = @"</color>";
-        private readonly Regex ColorRegex = new Regex(ColorRegexText);
-        private readonly Regex ColorEndRegex = new Regex(ColorEndRegexText);
+        private static readonly Regex ColorRegex = new Regex(ColorRegexText);
+        private static readonly Regex ColorEndRegex = new Regex(ColorEndRegexText);
         // 大小
         private const string SizeRegexText = @"<size=(\d+)>";
         private const string SizeEndRegexText = @"</size>";
-        private readonly Regex SizeRegex = new Regex(SizeRegexText);
-        private readonly Regex SizeEndRegex = new Regex(SizeEndRegexText);
+        private static readonly Regex SizeRegex = new Regex(SizeRegexText);
+        private static readonly Regex SizeEndRegex = new Regex(SizeEndRegexText);
         
         // 追加的富文本
         // 描边
         private static readonly string OutlineRegexText = @"<outline=((#[0-9a-f]{8})|(#[0-9a-f]{6})|(" + GetColorWords() + @"))>";
         private const string OutlineEndRegexText = @"</outline>";
-        private readonly Regex OutlineRegex = new Regex(OutlineRegexText, RegexOptions.IgnoreCase);
-        private readonly Regex OutlineEndRegex = new Regex(OutlineEndRegexText);
+        private static readonly Regex OutlineRegex = new Regex(OutlineRegexText, RegexOptions.IgnoreCase);
+        private static readonly Regex OutlineEndRegex = new Regex(OutlineEndRegexText);
 
         // 阴影
         private const string ShadowRegexText = @"<shadow>";
         private const string ShadowEndRegexText = @"</shadow>";
-        private readonly Regex ShadowRegex = new Regex(ShadowRegexText);
-        private readonly Regex ShadowEndRegex = new Regex(ShadowEndRegexText);
+        private static readonly Regex ShadowRegex = new Regex(ShadowRegexText);
+        private static readonly Regex ShadowEndRegex = new Regex(ShadowEndRegexText);
         
         // 下划线
         private static readonly string UnderlineRegexText = @"<underline=((#[0-9a-f]{8})|(#[0-9a-f]{6})|(" + GetColorWords() + @"))>";
         private const string UnderlineEndRegexText = @"</underline>";
-        private readonly Regex UnderlineRegex = new Regex(UnderlineRegexText);
-        private readonly Regex UnderlineEndRegex = new Regex(UnderlineEndRegexText);
+        private static readonly Regex UnderlineRegex = new Regex(UnderlineRegexText);
+        private static readonly Regex UnderlineEndRegex = new Regex(UnderlineEndRegexText);
         
         // link
         // private static readonly string LinkRegexText = @"<link=([a-zA-z]+://[^\s]*?)>";
         private static readonly string LinkRegexText = @"<link=([a-zA-Z][a-zA-Z0-9+\-.]*://[^\s>]+)>";
         private const string LinkEndRegexText = @"</link>";
-        private readonly Regex LinkRegex = new Regex(LinkRegexText);
-        private readonly Regex LinkEndRegex = new Regex(LinkEndRegexText);
+        private static readonly Regex LinkRegex = new Regex(LinkRegexText);
+        private static readonly Regex LinkEndRegex = new Regex(LinkEndRegexText);
         
         // GIF动图
         private static readonly Regex GifRegex = new Regex(@"<gif=([a-zA-Z0-9_\-\(\)\.]+)/>");
