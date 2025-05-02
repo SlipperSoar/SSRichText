@@ -8,6 +8,10 @@
         "richtext",
         "unity"
     ],
+    "author": {
+        "name": "SlipperSoar",
+        "url": "https://github.com/SlipperSoar"
+    },
     "license": "MIT",
     "licensesUrl": "https://github.com/SlipperSoar/SSRichText/LICENSE",
     "documentationUrl": "https://github.com/SlipperSoar/SSRichText"
