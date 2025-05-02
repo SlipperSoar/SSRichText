@@ -7,7 +7,7 @@ using UnityEngine;
 
 namespace SS.Editor
 {
-    public class GIFViewerWindow : UnityEditor.EditorWindow
+    public class GIFViewerWindow : EditorWindow
     {
         private float previewSize = 128f;
         private List<GifData> gifFrames;
