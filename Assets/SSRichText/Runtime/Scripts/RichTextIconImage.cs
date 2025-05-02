@@ -585,7 +585,7 @@ namespace SS.UIComponent
             
             if (gifCoroutines.Count > 0)
             {
-                foreach (var gifCoroutine in gifCoroutines)
+                foreach (var gifCoroutine in gifCoroutines.Where(gifCoroutine => gifCoroutine.Value != null))
                 {
                     StopCoroutine(gifCoroutine.Value);
                 }
@@ -631,7 +631,14 @@ namespace SS.UIComponent
             var index = 1;
             var countDown = 0f;
 
-            var verts = _gifs[gifInfo];
+            if (!_gifs.TryGetValue(gifInfo, out var verts))
+            {
+#if UNITY_EDITOR
+                Debug.Log($"Can't Play Gif: {gifInfo.Content}, not found in _gifs");
+#endif
+                yield break;
+            }
+
             var offsetScale = UV2OffsetScale(verts[3].uv0.x, verts[3].uv0.y, verts[1].uv0.x, verts[1].uv0.y);
 #if UNITY_EDITOR
             Debug.Log($"Play Gif: {gifInfo.Content}, offset and scale: {offsetScale}");

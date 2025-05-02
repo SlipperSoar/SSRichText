@@ -26,7 +26,7 @@ Unity版本：Unity2020或以上经过测试可用，Unity2019及以下或Unity6
 | \<outline=red>\</outline> | 描边  |   \<outline=red>或\<outline=#ffffffff>设置颜色   |
 |    \<shadow>\</shadow>    | 阴影  |                     ...                     |
 |       \<icon=xxxx/>       | 图标  |             需要配合IconProvider使用              |
-| \<underline>\</underline> | 下划线 | \<underline=red>或\<underline=#ffffffff>设置颜色 |
+| \<underline=red>\</underline> | 下划线 | \<underline=red>或\<underline=#ffffffff>设置颜色 |
 |    \<link=url>\</link>    | 链接  |               url可以填写具体的链接地址                |
 |       \<gif=xxxx/>        | 动图  |        需要配合GifDecoder和LoadManager使用         |
 
@@ -38,6 +38,19 @@ Unity版本：Unity2020或以上经过测试可用，Unity2019及以下或Unity6
 |    \<icon=xxxx/>    | OnClick | type, iconName |                        -                        |
 |    \<gif=xxxx/>     | OnClick | type, gifName  |                        -                        |
 |         默认          | OnClick |   type, 文本内容   | 包含outline、underline、shadow以及原生支持的color、size、b、i |
+
+## 使用方法
+
+### 通过upm安装custom package
+
+1. 打开Unity Package Manager
+2. 点击+ -> Add package from git URL...
+3. 填写git URL：https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText
+
+### 通过.unitypackage安装
+
+1. 前往[releases](https://github.com/SlipperSoar/SSRichText/releases)下载.unitypackage
+2. 拖入UnityEditor
 
 ## 已实现或规划中功能
 

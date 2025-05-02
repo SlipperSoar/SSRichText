@@ -1,0 +1,14 @@
+{
+    "name": "com.github-slippersoar.ssrichtext",
+    "displayName": "SSRichText",
+    "version": "1.0.0",
+    "description": "A Legacy Rich Text UI Component for Unity",
+    "unity": "2020.3",
+    "keywords": [
+        "richtext",
+        "unity"
+    ],
+    "license": "MIT",
+    "licensesUrl": "https://github.com/SlipperSoar/SSRichText/tree/main/LICENSE",
+    "documentationUrl": "https://github.com/SlipperSoar/SSRichText/tree/main"
+}
