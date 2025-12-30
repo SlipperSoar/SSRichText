@@ -889,6 +889,9 @@ namespace SS.UIComponent
         /// <summary>
         /// 投影效果
         /// </summary>
+        /// <param name="richInfo">富文本信息</param>
+        /// <param name="verts">顶点信息</param>
+        /// <param name="vertCount">顶点数</param>
         /// <param name="iconIndexList">需要应用阴影的Icon（占位）字符的索引列表</param>
         private void ApplyShadowEffect(RichInfo richInfo, IList<UIVertex> verts, int vertCount, LinkedList<int> iconIndexList)
         {
@@ -925,6 +928,11 @@ namespace SS.UIComponent
                     continue;
                 }
 
+                // 单个字符的四个顶点为[start, end)
+                var vt1 = verts[start];
+                var vt2 = verts[start + 2];
+                // 从左上顺时针到左下，vt1.y > vt2.y
+                var offset = Mathf.Max(1, (vt1.position.y - vt2.position.y) / 16);
                 var end = start + 4;
                 UIVertex vt;
                 for (var j = start; j < end; j++)
@@ -932,8 +940,8 @@ namespace SS.UIComponent
                     vt = verts[j];
                     verts.Add(vt);
                     Vector3 v = vt.position;
-                    v.x += -1;
-                    v.y += 1;
+                    v.x += -offset;
+                    v.y += offset;
                     vt.position = v;
                     // 先把本身透明的给改成不透明
                     // 这是为图标准备的，但图标不在这里计算阴影了
