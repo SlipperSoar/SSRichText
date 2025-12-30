@@ -966,28 +966,40 @@ namespace SS.UIComponent
                 return;
             }
 
-            int start = richInfo.StartIndex * 4;
-            int end = Mathf.Min(richInfo.EndIndex * 4, vertCount);
             UIVertex vt;
-            for(int x = -1; x <= 1; x += 2)
+            for (var i = richInfo.StartIndex; i < richInfo.EndIndex; i++)
             {
-                for(int y = -1; y <= 1; y += 2)
+                var start = i * 4;
+                var end = start + 4;
+                // 单个字符的四个顶点为[start, end)
+                var vt1 = verts[start];
+                var vt2 = verts[start + 2];
+                // 从左上顺时针到左下，vt1.y > vt2.y
+                var size = vt1.position.y - vt2.position.y;
+                var offset = Mathf.Clamp(size / 64, 1, 2);
+                for(int x = -1; x <= 1; x += 2)
                 {
-                    for(int i = start; i < end; i++)
+                    for(int y = -1; y <= 1; y += 2)
                     {
-                        vt = verts[i];
-                        Vector3 v = vt.position;
-                        v.x += x;
-                        v.y += y;
-                        var newColor = richInfo.Color;
-                        newColor.a = (newColor.a * verts[i].color.a) / 255f;
-                        vt.color = newColor;
-                        verts.Add(vt);
+                        for (int j = start; j < end; j++)
+                        {
+                            vt = verts[j];
+                            Vector3 v = vt.position;
+                            v.x += x * offset;
+                            v.y += y * offset;
+                            var newColor = richInfo.Color;
+                            newColor.a = (newColor.a * verts[j].color.a) / 255f;
+                            vt.color = newColor;
+                            vt.position = v;
+                            verts.Add(vt);
+                        }
                     }
                 }
             }
 
-            for(int i = start; i < end; i++)
+            var startAt = richInfo.StartIndex * 4;
+            var endAt = Mathf.Min(richInfo.EndIndex * 4, vertCount);
+            for(var i = startAt; i < endAt; i++)
                 verts.Add(verts[i]);
         }
 
