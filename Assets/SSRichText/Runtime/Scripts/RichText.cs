@@ -31,24 +31,34 @@ namespace SS.UIComponent
         {
             /// <summary>斜体</summary>
             Italic,
+
             /// <summary>粗体</summary>
             Bold,
+
             /// <summary>色彩</summary>
             Color,
+
             /// <summary>字体大小</summary>
             Size,
+
             /// <summary>描边</summary>
             Outline,
+
             /// <summary>阴影</summary>
             Shadow,
+
             /// <summary>下划线</summary>
             Underline,
+
             /// <summary>link</summary>
             Link,
+
             /// <summary>图标</summary>
             Icon,
+
             /// <summary>Gif动图</summary>
             Gif,
+
             /// <summary>删除线</summary>
             StrikeLine,
         }
@@ -62,7 +72,7 @@ namespace SS.UIComponent
             Middle,
             Bottom,
         }
-        
+
         private class TagInfo
         {
             public RichType Type;
@@ -76,17 +86,22 @@ namespace SS.UIComponent
         public class RichInfo
         {
             public RichType Type;
+
             /// <summary>富文本开始的位置（包含）</summary>
             public int StartIndex;
+
             /// <summary>富文本结束的位置（不包含）</summary>
             public int EndIndex;
+
             /// <summary>根据具体类型决定这个content要怎么使用</summary>
             public string Content;
+
             /// <summary>顶点颜色</summary>
             public Color Color;
 
             /// <summary>受影响的文本内容</summary>
             public string EffectedStr;
+
             /// <summary>
             /// 富文本区域对应的所有矩形
             /// x, y => 左下， z, w => 右上
@@ -99,23 +114,25 @@ namespace SS.UIComponent
             /// </summary>
             public List<int[]> RectIndexes;
         }
-        
+
         public class DrawingLineRichInfo : RichInfo
         {
             /// <summary> 划线高度 </summary>
             public float LineHeight = 2f;
+
             /// <summary> 划线的纵向位置 </summary>
             public float YPosFromBase;
+
             /// <summary>基准位置</summary>
             public LineBasedPos BasedPos;
         }
 
         #endregion
-        
+
         #region properties
 
         public event Action<RichType, string> OnClick;
-        
+
         /// <summary>可以直接使用的颜色单词</summary>
         private static Dictionary<string, Color> Colors = new Dictionary<string, Color>()
         {
@@ -137,32 +154,40 @@ namespace SS.UIComponent
 
         // white space
         private readonly Regex WhiteSpaceRegex = new Regex(@"\s+");
-        
+
         // Unity基础的富文本
         // 斜体
         private const string ItalicRegexText = @"<i>";
         private const string ItalicEndRegexText = @"</i>";
         private static readonly Regex ItalicRegex = new Regex(ItalicRegexText);
+
         private static readonly Regex ItalicEndRegex = new Regex(ItalicEndRegexText);
+
         // 粗体
         private const string BoldRegexText = @"<b>";
         private const string BoldEndRegexText = @"</b>";
         private static readonly Regex BoldRegex = new Regex(BoldRegexText);
+
         private static readonly Regex BoldEndRegex = new Regex(BoldEndRegexText);
+
         // 颜色
         private static string ColorRegexText => @"<color=((#[0-9a-f]{8})|(#[0-9a-f]{6})|(" + GetColorWords() + @"))>";
         private const string ColorEndRegexText = @"</color>";
         private static readonly Regex ColorRegex = new Regex(ColorRegexText);
+
         private static readonly Regex ColorEndRegex = new Regex(ColorEndRegexText);
+
         // 大小
         private const string SizeRegexText = @"<size=(\d+)>";
         private const string SizeEndRegexText = @"</size>";
         private static readonly Regex SizeRegex = new Regex(SizeRegexText);
         private static readonly Regex SizeEndRegex = new Regex(SizeEndRegexText);
-        
+
         // 追加的富文本
         // 描边
-        private static readonly string OutlineRegexText = @"<outline=((#[0-9a-f]{8})|(#[0-9a-f]{6})|(" + GetColorWords() + @"))>";
+        private static readonly string OutlineRegexText =
+            @"<outline=((#[0-9a-f]{8})|(#[0-9a-f]{6})|(" + GetColorWords() + @"))>";
+
         private const string OutlineEndRegexText = @"</outline>";
         private static readonly Regex OutlineRegex = new Regex(OutlineRegexText, RegexOptions.IgnoreCase);
         private static readonly Regex OutlineEndRegex = new Regex(OutlineEndRegexText);
@@ -172,38 +197,40 @@ namespace SS.UIComponent
         private const string ShadowEndRegexText = @"</shadow>";
         private static readonly Regex ShadowRegex = new Regex(ShadowRegexText);
         private static readonly Regex ShadowEndRegex = new Regex(ShadowEndRegexText);
-        
+
         // 下划线
-        private static readonly string UnderlineRegexText = @"<underline=((#[0-9a-f]{8})|(#[0-9a-f]{6})|(" + GetColorWords() + @"))>";
+        private static readonly string UnderlineRegexText =
+            @"<underline=((#[0-9a-f]{8})|(#[0-9a-f]{6})|(" + GetColorWords() + @"))>";
+
         private const string UnderlineEndRegexText = @"</underline>";
         private static readonly Regex UnderlineRegex = new Regex(UnderlineRegexText);
         private static readonly Regex UnderlineEndRegex = new Regex(UnderlineEndRegexText);
-        
+
         // 删除线
         private const string StrikeLineRegexText = @"<s>";
         private const string StrikeLineEndRegexText = @"</s>";
         private static readonly Regex StrikeLineRegex = new Regex(StrikeLineRegexText);
         private static readonly Regex StrikeLineEndRegex = new Regex(StrikeLineEndRegexText);
-        
+
         // link
         // private static readonly string LinkRegexText = @"<link=([a-zA-z]+://[^\s]*?)>";
         private static readonly string LinkRegexText = @"<link=([a-zA-Z][a-zA-Z0-9+\-.]*://[^\s>]+)>";
         private const string LinkEndRegexText = @"</link>";
         private static readonly Regex LinkRegex = new Regex(LinkRegexText);
         private static readonly Regex LinkEndRegex = new Regex(LinkEndRegexText);
-        
+
         // GIF动图
         private static readonly Regex GifRegex = new Regex(@"<gif=([a-zA-Z0-9_\-\(\)\.]+)/>");
 
         #endregion
 
         // 占位字符，到时候要将alpha设置为0
-        const string IconReplaceChar = "\u25a0";//■
+        const string IconReplaceChar = "\u25a0"; //■
         readonly UIVertex[] m_TempVerts = new UIVertex[4];
         private float spaceWidth;
 
         public static IIconProvider GlobalIconProvider = new IconProvider();
-        
+
         private IIconProvider _iconProvider;
 
         private IIconProvider iconProvider
@@ -219,8 +246,9 @@ namespace SS.UIComponent
             }
             set => _iconProvider = value;
         }
-        
+
         private RichTextIconImage _iconImage;
+
         private RichTextIconImage iconImage
         {
             get
@@ -245,7 +273,7 @@ namespace SS.UIComponent
                         _iconImage.raycastTarget = false;
                     }
                 }
-                
+
                 return _iconImage;
             }
         }
@@ -299,7 +327,7 @@ namespace SS.UIComponent
 #endif
 
         #endregion
-        
+
         #region override
 
         protected override void OnPopulateMesh(VertexHelper toFill)
@@ -309,7 +337,7 @@ namespace SS.UIComponent
                 base.OnPopulateMesh(toFill);
                 return;
             }
-            
+
             if (font == null)
                 return;
 
@@ -329,7 +357,7 @@ namespace SS.UIComponent
             // Apply the offset to the vertices
             var verts = cachedTextGenerator.verts;
             var vertCount = verts.Count;
-            
+
             // 处理富文本效果
             // 图标的（下划线也用）
             var iconInfos = new List<RichInfo>();
@@ -337,7 +365,7 @@ namespace SS.UIComponent
             var iconVerts = new List<UIVertex[]>();
             // Gif动图的
             var gifs = new Dictionary<RichInfo, UIVertex[]>();
-            
+
             // 图标阴影。这个每个元素只用一次就remove，用LinkedList可以避免数组整体移动，也用不着哈希计算
             var iconShadows = new LinkedList<int>();
             // 划线暂存，含下划线、删除线等
@@ -425,7 +453,7 @@ namespace SS.UIComponent
                     }
                 }
             }
-            
+
             float unitsPerPixel = 1 / pixelsPerUnit;
             vertCount = verts.Count;
 
@@ -472,7 +500,7 @@ namespace SS.UIComponent
                 foreach (var gif in gifs)
                 {
                     var tempVerts = gif.Value;
-                    
+
                     for (int j = 0; j < 4; j++)
                     {
                         tempVerts[j].position *= unitsPerPixel;
@@ -491,7 +519,7 @@ namespace SS.UIComponent
                     if (tempVertsIndex == 3)
                         toFill.AddUIVertexQuad(m_TempVerts);
                 }
-                
+
                 for (int i = 0; i < iconVerts.Count; i++)
                 {
                     var tempVerts = iconVerts[i];
@@ -501,11 +529,11 @@ namespace SS.UIComponent
                         tempVerts[j].position *= unitsPerPixel;
                     }
                 }
-                
+
                 foreach (var gif in gifs)
                 {
                     var tempVerts = gif.Value;
-                    
+
                     for (int j = 0; j < 4; j++)
                     {
                         tempVerts[j].position *= unitsPerPixel;
@@ -525,7 +553,7 @@ namespace SS.UIComponent
         {
             RectTransformUtility.ScreenPointToLocalPointInRectangle(rectTransform, eventData.position,
                 eventData.pressEventCamera, out var lp);
-            
+
             var targets = new List<RichInfo>();
             foreach (var richInfo in richInfos)
             {
@@ -570,7 +598,7 @@ namespace SS.UIComponent
         }
 
         #endregion
-        
+
         #region Private Methods
 
         private List<RichInfo> ProcessRichText(string richText, out string resultText, out string textWithoutTag)
@@ -586,16 +614,17 @@ namespace SS.UIComponent
                 {
                     ColorUtility.TryParseHtmlString(colorStr, out tagColor);
                 }
+
                 return tagColor;
             }
-            
+
             // 图标
             tags.AddRange(GetTags(resultText, IconRegex, RichType.Icon, true, (str, info) =>
             {
                 info.Content = str;
                 info.Color = Color.white;
             }));
-            
+
             // Gif动图
             tags.AddRange(GetTags(resultText, GifRegex, RichType.Gif, true, (str, info) =>
             {
@@ -607,34 +636,35 @@ namespace SS.UIComponent
             tags.AddRange(GetTags(resultText, OutlineRegex, RichType.Outline,
                 paramProcessor: (str, info) => { info.Color = GetColor(str); }));
             tags.AddRange(GetTags(resultText, OutlineEndRegex, RichType.Outline, isCloseTag: true));
-            
+
             // 阴影
             tags.AddRange(GetTags(resultText, ShadowRegex, RichType.Shadow,
                 paramProcessor: (str, info) => { info.Color = GetColor(str); }));
             tags.AddRange(GetTags(resultText, ShadowEndRegex, RichType.Shadow, isCloseTag: true));
-            
+
             // 颜色
             tags.AddRange(GetTags(resultText, ColorRegex, RichType.Color,
                 paramProcessor: (str, info) => { info.Color = GetColor(str); }));
             tags.AddRange(GetTags(resultText, ColorEndRegex, RichType.Color, isCloseTag: true));
-            
+
             // 大小
-            tags.AddRange(GetTags(resultText, SizeRegex, RichType.Size, paramProcessor: (str, info) => { info.Content = str; }));
+            tags.AddRange(GetTags(resultText, SizeRegex, RichType.Size,
+                paramProcessor: (str, info) => { info.Content = str; }));
             tags.AddRange(GetTags(resultText, SizeEndRegex, RichType.Size, isCloseTag: true));
-            
+
             // 斜体
             tags.AddRange(GetTags(resultText, ItalicRegex, RichType.Italic));
             tags.AddRange(GetTags(resultText, ItalicEndRegex, RichType.Italic, isCloseTag: true));
-            
+
             // 粗体
             tags.AddRange(GetTags(resultText, BoldRegex, RichType.Bold));
             tags.AddRange(GetTags(resultText, BoldEndRegex, RichType.Bold, isCloseTag: true));
-            
+
             // 下划线
             tags.AddRange(GetTags(resultText, UnderlineRegex, RichType.Underline,
                 paramProcessor: (str, info) => { info.Color = GetColor(str); }));
             tags.AddRange(GetTags(resultText, UnderlineEndRegex, RichType.Underline, isCloseTag: true));
-            
+
             // 删除线
             tags.AddRange(GetTags(resultText, StrikeLineRegex, RichType.StrikeLine));
             tags.AddRange(GetTags(resultText, StrikeLineEndRegex, RichType.StrikeLine, isCloseTag: true));
@@ -675,6 +705,7 @@ namespace SS.UIComponent
                         }
                     }
                 }
+
                 if (tag.IsClose)
                 {
                     // 匹配到关闭标签
@@ -706,7 +737,7 @@ namespace SS.UIComponent
                             EndIndex = tag.Index - offset + 1,
                             Color = tag.Color,
                         });
-                        
+
                         offset += tag.Length - 1;
                         continue;
                     }
@@ -722,6 +753,7 @@ namespace SS.UIComponent
                         // TODO: 匹配失败，抛出异常
                         continue;
                     }
+
                     // 匹配成功，记录关闭标签的索引
                     var richInfo = richInfoStack.Pop();
                     richInfo.EndIndex = tag.Index - offset;
@@ -807,11 +839,11 @@ namespace SS.UIComponent
                         resultStrBuilder.Append(resultText.GetSubString(index, strPair.start));
                         index = strPair.start + strPair.length;
                     }
-                    
+
                     tempStrBuilder.Append(resultText.GetSubString(tempIndex, strPair.start));
                     tempIndex = strPair.start + strPair.length;
                 }
-                
+
                 // 加上最后的字符串
                 resultStrBuilder.Append(resultText.GetSubString(index));
                 tempStrBuilder.Append(resultText.GetSubString(tempIndex));
@@ -841,7 +873,8 @@ namespace SS.UIComponent
             return richInfos;
         }
 
-        private List<TagInfo> GetTags(string richText, Regex tagRegex, RichType richType, bool isCloseTag = false, Action<string, TagInfo> paramProcessor = null)
+        private List<TagInfo> GetTags(string richText, Regex tagRegex, RichType richType, bool isCloseTag = false,
+            Action<string, TagInfo> paramProcessor = null)
         {
             var tags = new List<TagInfo>();
             var matches = tagRegex.Matches(richText);
@@ -850,7 +883,7 @@ namespace SS.UIComponent
                 var match = matches[i];
                 var index = match.Index;
                 var length = match.Length;
-                
+
                 var tagInfo = new TagInfo()
                 {
                     Type = richType,
@@ -858,15 +891,15 @@ namespace SS.UIComponent
                     Length = length,
                     IsClose = isCloseTag,
                 };
-                
+
                 paramProcessor?.Invoke(match.Groups[1].Value, tagInfo);
-                
+
                 tags.Add(tagInfo);
             }
 
             return tags;
         }
-        
+
         private static List<int> GetWhiteSpaceIndexesInString(string str)
         {
             var result = new List<int>();
@@ -885,7 +918,7 @@ namespace SS.UIComponent
         {
             return string.Join("|", Colors.Keys);
         }
-        
+
         /// <summary>
         /// 投影效果
         /// </summary>
@@ -893,14 +926,15 @@ namespace SS.UIComponent
         /// <param name="verts">顶点信息</param>
         /// <param name="vertCount">顶点数</param>
         /// <param name="iconIndexList">需要应用阴影的Icon（占位）字符的索引列表</param>
-        private void ApplyShadowEffect(RichInfo richInfo, IList<UIVertex> verts, int vertCount, LinkedList<int> iconIndexList)
+        private void ApplyShadowEffect(RichInfo richInfo, IList<UIVertex> verts, int vertCount,
+            LinkedList<int> iconIndexList)
         {
             // 先检查能不能被渲染出来，不能那就算了
             if (richInfo.StartIndex * 4 >= vertCount)
             {
                 return;
             }
-            
+
             // 计算图标阴影所处的索引
             var iconIndexes = new Queue<int>();
             for (var i = 0; i < richInfo.EffectedStr.Length; i++)
@@ -977,9 +1011,9 @@ namespace SS.UIComponent
                 // 从左上顺时针到左下，vt1.y > vt2.y
                 var size = vt1.position.y - vt2.position.y;
                 var offset = Mathf.Clamp(size / 64, 1, 2);
-                for(int x = -1; x <= 1; x += 2)
+                for (int x = -1; x <= 1; x += 2)
                 {
-                    for(int y = -1; y <= 1; y += 2)
+                    for (int y = -1; y <= 1; y += 2)
                     {
                         for (int j = start; j < end; j++)
                         {
@@ -999,21 +1033,22 @@ namespace SS.UIComponent
 
             var startAt = richInfo.StartIndex * 4;
             var endAt = Mathf.Min(richInfo.EndIndex * 4, vertCount);
-            for(var i = startAt; i < endAt; i++)
+            for (var i = startAt; i < endAt; i++)
                 verts.Add(verts[i]);
         }
 
         /// <summary>
         /// 图标效果
         /// </summary>
-        private (Sprite icon, UIVertex[] verts) ApplyIcon(RichInfo richInfo, IList<UIVertex> verts, Dictionary<string, Sprite> iconCache, int vertCount)
+        private (Sprite icon, UIVertex[] verts) ApplyIcon(RichInfo richInfo, IList<UIVertex> verts,
+            Dictionary<string, Sprite> iconCache, int vertCount)
         {
             // 先检查能不能被渲染出来，不能那就算了
             if (richInfo.StartIndex * 4 >= vertCount)
             {
                 return (null, null);
             }
-            
+
             var iconName = richInfo.Content;
             Sprite iconSprite;
             if (!iconCache.TryGetValue(iconName, out iconSprite))
@@ -1025,7 +1060,7 @@ namespace SS.UIComponent
             {
                 lineUVs = new Vector4[4];
             }
-            
+
             var start = richInfo.StartIndex * 4;
             var end = start + 4;
             var iconVerts = new UIVertex[4];
@@ -1058,7 +1093,7 @@ namespace SS.UIComponent
             {
                 return (null, null);
             }
-            
+
             return (iconSprite, iconVerts);
         }
 
@@ -1077,7 +1112,7 @@ namespace SS.UIComponent
             {
                 lineUVs = new Vector4[4];
             }
-            
+
             var start = richInfo.StartIndex * 4;
             var end = start + 4;
             var gifVerts = new UIVertex[4];
@@ -1104,10 +1139,10 @@ namespace SS.UIComponent
                 iconVert.color.a = 255;
                 gifVerts[i - start] = iconVert;
             }
-            
+
             return gifVerts;
         }
-        
+
         /// <summary>
         /// 下划线效果
         /// </summary>
@@ -1128,12 +1163,12 @@ namespace SS.UIComponent
             for (int i = 0; i < count; i++)
             {
                 var rectIndex = richInfo.RectIndexes[i];
-                
+
                 // 顶点顺序是左上顺时针到左下
                 int start = rectIndex[0] * 4;
                 // 要添加下划线的最后一个字符的右下角顶点索引
                 int end = Mathf.Min(rectIndex[1] * 4, vertCount) - 2;
-                
+
                 // 划线的四个顶点
                 var lineVerts = new UIVertex[4];
                 // 起止坐标
@@ -1154,6 +1189,7 @@ namespace SS.UIComponent
                         basedY = endY;
                         break;
                 }
+
                 // 计算下划线的四个顶点
                 lineVerts[0] = new UIVertex
                 {
@@ -1175,7 +1211,7 @@ namespace SS.UIComponent
                     position = new Vector3(startX, basedY + padding - underlineHeight / 2, 0),
                     color = richInfo.Color,
                 };
-                
+
                 result.Add(lineVerts);
             }
 
@@ -1227,6 +1263,7 @@ namespace SS.UIComponent
                         richInfo.Rects.Add(rect);
                         richInfo.RectIndexes.Add(indexes);
                     }
+
                     break;
                 }
 
@@ -1259,7 +1296,7 @@ namespace SS.UIComponent
                             indexes[1] = i;
                             richInfo.Rects.Add(rect);
                             richInfo.RectIndexes.Add(indexes);
-                            
+
                             // 重置一下，继续找下一个
                             rect = -Vector4.one;
                             indexes = new int[2];
@@ -1269,7 +1306,7 @@ namespace SS.UIComponent
                     }
                 }
             }
-            
+
             // 说明找到最后没闭上，也就是最后一行没算上
             if (state == 1)
             {
@@ -1282,7 +1319,8 @@ namespace SS.UIComponent
             }
         }
 
-        private static IList<UIVertex> ProcessRawTags(IList<UIVertex> vertices, string resultText, string textWithoutTag)
+        private static IList<UIVertex> ProcessRawTags(IList<UIVertex> vertices, string resultText,
+            string textWithoutTag)
         {
             // 得先确认顶点是否需要修改
             if (vertices.Count == textWithoutTag.Length * 4)
@@ -1300,7 +1338,7 @@ namespace SS.UIComponent
                 {
                     continue;
                 }
-                
+
                 // 在部分行无法显示时，顶点虽然包含标签但不包含不显示的内容，这里要做判断
                 if (vertices.Count <= i * 4)
                 {
@@ -1316,12 +1354,13 @@ namespace SS.UIComponent
 
             return newVertices;
         }
-        
+
         #endregion
 
         #region Coroutine
 
-        private IEnumerator CallIconUpdate(List<RichInfo> iconInfos, Dictionary<string, Sprite> icons, List<UIVertex[]> vertices, LinkedList<int> iconShadows, Dictionary<RichInfo, UIVertex[]> gifs)
+        private IEnumerator CallIconUpdate(List<RichInfo> iconInfos, Dictionary<string, Sprite> icons,
+            List<UIVertex[]> vertices, LinkedList<int> iconShadows, Dictionary<RichInfo, UIVertex[]> gifs)
         {
             yield return null;
             // 处理图标

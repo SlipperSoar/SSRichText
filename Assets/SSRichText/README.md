@@ -23,7 +23,7 @@ Unity版本：Unity2020或以上经过测试可用，Unity2019及以下或Unity6
 |         \<i>\</i>         | 斜体  |                   unity原生                   |
 |      \<size>\</size>      | 大小  |                   unity原生                   |
 |   \<color=red>\</color>   | 颜色  |                   unity原生                   |
-|           \<s>\</s>           | 删除线 |   \<outline=red>或\<outline=#ffffffff>设置颜色   |
+|           \<s>\</s>           | 删除线 |   颜色与字体颜色相同，线宽根据字体大小动态变化   |
 | \<outline=red>\</outline> | 描边  |   \<outline=red>或\<outline=#ffffffff>设置颜色   |
 |    \<shadow>\</shadow>    | 阴影  |                     ...                     |
 |       \<icon=xxxx/>       | 图标  |             需要配合IconProvider使用              |
