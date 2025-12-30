@@ -49,6 +49,18 @@ namespace SS.UIComponent
             Icon,
             /// <summary>Gif动图</summary>
             Gif,
+            /// <summary>删除线</summary>
+            StrikeLine,
+        }
+
+        /// <summary>
+        /// 绘制划线时线的位置基准
+        /// </summary>
+        public enum LineBasedPos
+        {
+            Top,
+            Middle,
+            Bottom,
         }
         
         private class TagInfo
@@ -86,6 +98,16 @@ namespace SS.UIComponent
             /// 0 => 开始索引， 1 => 结束索引
             /// </summary>
             public List<int[]> RectIndexes;
+        }
+        
+        public class DrawingLineRichInfo : RichInfo
+        {
+            /// <summary> 划线高度 </summary>
+            public float LineHeight = 2f;
+            /// <summary> 划线的纵向位置 </summary>
+            public float YPosFromBase;
+            /// <summary>基准位置</summary>
+            public LineBasedPos BasedPos;
         }
 
         #endregion
@@ -157,6 +179,12 @@ namespace SS.UIComponent
         private static readonly Regex UnderlineRegex = new Regex(UnderlineRegexText);
         private static readonly Regex UnderlineEndRegex = new Regex(UnderlineEndRegexText);
         
+        // 删除线
+        private const string StrikeLineRegexText = @"<s>";
+        private const string StrikeLineEndRegexText = @"</s>";
+        private static readonly Regex StrikeLineRegex = new Regex(StrikeLineRegexText);
+        private static readonly Regex StrikeLineEndRegex = new Regex(StrikeLineEndRegexText);
+        
         // link
         // private static readonly string LinkRegexText = @"<link=([a-zA-z]+://[^\s]*?)>";
         private static readonly string LinkRegexText = @"<link=([a-zA-Z][a-zA-Z0-9+\-.]*://[^\s>]+)>";
@@ -224,7 +252,7 @@ namespace SS.UIComponent
 
         private static Sprite _whiteQuad;
         private const string UnderlineSpriteName = "<underline>";
-        private Vector4[] underlineUVs;
+        private Vector4[] lineUVs;
 
         private List<RichInfo> richInfos;
 
@@ -312,8 +340,8 @@ namespace SS.UIComponent
             
             // 图标阴影。这个每个元素只用一次就remove，用LinkedList可以避免数组整体移动，也用不着哈希计算
             var iconShadows = new LinkedList<int>();
-            // 下划线暂存
-            var underlineInfos = new List<RichInfo>();
+            // 划线暂存，含下划线、删除线等
+            var drawingLineInfos = new List<RichInfo>();
             // 获取最后一个可显示出来的字符顶点，以免超出显示区域后显示错乱
             verts = ProcessRawTags(verts, resultText, textWithoutTag);
             vertCount = verts.Count;
@@ -350,22 +378,27 @@ namespace SS.UIComponent
                         break;
                     case RichType.Underline:
                     {
-                        underlineInfos.Add(richInfo);
+                        drawingLineInfos.Add(richInfo);
+                    }
+                        break;
+                    case RichType.StrikeLine:
+                    {
+                        drawingLineInfos.Add(richInfo);
                     }
                         break;
                 }
             }
 
-            // 尝试渲染下划线
+            // 尝试渲染 划线 含下划线、删除线
             // 当存在图标时，可以通过图标的占位字符拿到铺满颜色的uv区域
             // 当不存在图标时，没有占位字符可以用，就用图标的渲染方式来渲染下划线
-            if (underlineUVs == null)
+            if (lineUVs == null)
             {
-                foreach (var richInfo in underlineInfos)
+                foreach (var richInfo in drawingLineInfos)
                 {
                     richInfo.Content = UnderlineSpriteName;
                     // 考虑换行，会是多个矩形
-                    var underlineVerts = ApplyUnderlineEffect(richInfo, verts, vertCount);
+                    var underlineVerts = ApplyDrawingLineEffect(richInfo, verts, vertCount);
                     CheckAndCreateWhiteQuad();
                     foreach (var uVerts in underlineVerts)
                     {
@@ -377,16 +410,16 @@ namespace SS.UIComponent
             }
             else
             {
-                foreach (var richInfo in underlineInfos)
+                foreach (var richInfo in drawingLineInfos)
                 {
                     // 考虑换行，会是多个矩形
-                    var underlineVerts = ApplyUnderlineEffect(richInfo, verts, vertCount);
+                    var underlineVerts = ApplyDrawingLineEffect(richInfo, verts, vertCount);
                     foreach (var uVerts in underlineVerts)
                     {
                         for (int i = 0; i < uVerts.Length; i++)
                         {
                             var vert = uVerts[i];
-                            vert.uv0 = underlineUVs[i];
+                            vert.uv0 = lineUVs[i];
                             verts.Add(vert);
                         }
                     }
@@ -401,8 +434,8 @@ namespace SS.UIComponent
             {
                 toFill.Clear();
                 // 清理icon
-                // 计算完把下划线用的uv清掉
-                underlineUVs = null;
+                // 计算完把划线用的uv清掉
+                lineUVs = null;
                 // 避免同时更新渲染
                 StartCoroutine(CallIconUpdate(iconInfos, icons, iconVerts, iconShadows, gifs));
                 return;
@@ -481,7 +514,7 @@ namespace SS.UIComponent
             }
 
             // 计算完把下划线用的uv清掉
-            underlineUVs = null;
+            lineUVs = null;
             // 避免同时更新渲染
             StartCoroutine(CallIconUpdate(iconInfos, icons, iconVerts, iconShadows, gifs));
 
@@ -602,6 +635,10 @@ namespace SS.UIComponent
                 paramProcessor: (str, info) => { info.Color = GetColor(str); }));
             tags.AddRange(GetTags(resultText, UnderlineEndRegex, RichType.Underline, isCloseTag: true));
             
+            // 删除线
+            tags.AddRange(GetTags(resultText, StrikeLineRegex, RichType.StrikeLine));
+            tags.AddRange(GetTags(resultText, StrikeLineEndRegex, RichType.StrikeLine, isCloseTag: true));
+
             // link
             tags.AddRange(GetTags(resultText, LinkRegex, RichType.Link,
                 paramProcessor: (str, info) => { info.Content = str; }));
@@ -709,13 +746,42 @@ namespace SS.UIComponent
                 else
                 {
                     tagStack.Push(tag);
-                    var richInfo = new RichInfo()
+                    RichInfo richInfo = null;
+                    switch (tag.Type)
                     {
-                        Type = tag.Type,
-                        StartIndex = tag.Index - offset,
-                        Color = tag.Color,
-                        Content = tag.Content,
-                    };
+                        case RichType.Underline:
+                            richInfo = new DrawingLineRichInfo()
+                            {
+                                Type = tag.Type,
+                                StartIndex = tag.Index - offset,
+                                Color = tag.Color,
+                                Content = tag.Content,
+                                LineHeight = 2f,
+                                YPosFromBase = -3f,
+                                BasedPos = LineBasedPos.Bottom
+                            };
+                            break;
+                        case RichType.StrikeLine:
+                            richInfo = new DrawingLineRichInfo()
+                            {
+                                Type = tag.Type,
+                                StartIndex = tag.Index - offset,
+                                Color = color,
+                                Content = tag.Content,
+                                LineHeight = Mathf.Max(fontSize / 8f, 1.5f),
+                                BasedPos = LineBasedPos.Middle
+                            };
+                            break;
+                        default:
+                            richInfo = new RichInfo()
+                            {
+                                Type = tag.Type,
+                                StartIndex = tag.Index - offset,
+                                Color = tag.Color,
+                                Content = tag.Content,
+                            };
+                            break;
+                    }
 
                     offset += tag.Length;
                     richInfoStack.Push(richInfo);
@@ -935,9 +1001,9 @@ namespace SS.UIComponent
                 iconSprite = iconProvider.GetIcon(iconName);
             }
 
-            if (underlineUVs == null || underlineUVs.Length == 0)
+            if (lineUVs == null || lineUVs.Length == 0)
             {
-                underlineUVs = new Vector4[4];
+                lineUVs = new Vector4[4];
             }
             
             var start = richInfo.StartIndex * 4;
@@ -959,7 +1025,7 @@ namespace SS.UIComponent
                 uv.y = (uv.y + uvCenterY) / 2;
                 vert.uv0 = uv;
                 verts[i] = vert;
-                underlineUVs[i - start] = uv;
+                lineUVs[i - start] = uv;
 
                 // 整理图标
                 var iconVert = vert;
@@ -987,9 +1053,9 @@ namespace SS.UIComponent
                 return null;
             }
 
-            if (underlineUVs == null || underlineUVs.Length == 0)
+            if (lineUVs == null || lineUVs.Length == 0)
             {
-                underlineUVs = new Vector4[4];
+                lineUVs = new Vector4[4];
             }
             
             var start = richInfo.StartIndex * 4;
@@ -1011,7 +1077,7 @@ namespace SS.UIComponent
                 uv.y = (uv.y + uvCenterY) / 2;
                 vert.uv0 = uv;
                 verts[i] = vert;
-                underlineUVs[i - start] = uv;
+                lineUVs[i - start] = uv;
 
                 // 整理图标
                 var iconVert = vert;
@@ -1025,12 +1091,19 @@ namespace SS.UIComponent
         /// <summary>
         /// 下划线效果
         /// </summary>
-        private List<UIVertex[]> ApplyUnderlineEffect(RichInfo richInfo, IList<UIVertex> verts, int vertCount)
+        private List<UIVertex[]> ApplyDrawingLineEffect(RichInfo richInfo, IList<UIVertex> verts, int vertCount)
         {
-            var underlineHeight = 2.0f;
-            var padding = 2f;
-
             var result = new List<UIVertex[]>();
+            // 转换为划线专用的类型
+            if (richInfo is not DrawingLineRichInfo lineRichInfo)
+            {
+                Debug.LogError($"Cant Cast to DrawingLineRichInfo: {richInfo}");
+                return result;
+            }
+
+            var underlineHeight = lineRichInfo.LineHeight;
+            var padding = lineRichInfo.YPosFromBase;
+
             var count = richInfo.Rects.Count;
             for (int i = 0; i < count; i++)
             {
@@ -1041,35 +1114,49 @@ namespace SS.UIComponent
                 // 要添加下划线的最后一个字符的右下角顶点索引
                 int end = Mathf.Min(rectIndex[1] * 4, vertCount) - 2;
                 
-                // 下划线的四个顶点
-                var underlineVerts = new UIVertex[4];
+                // 划线的四个顶点
+                var lineVerts = new UIVertex[4];
                 // 起止坐标
                 float startX = verts[start].position.x;
+                float startY = verts[start].position.y;
                 float endX = verts[end].position.x;
                 float endY = verts[end].position.y;
+                float basedY = 0;
+                switch (lineRichInfo.BasedPos)
+                {
+                    case LineBasedPos.Top:
+                        basedY = startY;
+                        break;
+                    case LineBasedPos.Middle:
+                        basedY = (startY + endY) / 2;
+                        break;
+                    case LineBasedPos.Bottom:
+                        basedY = endY;
+                        break;
+                }
                 // 计算下划线的四个顶点
-                underlineVerts[0] = new UIVertex
+                lineVerts[0] = new UIVertex
                 {
-                    position = new Vector3(startX, endY - padding, 0),
-                    color = richInfo.Color, // 下划线颜色
+                    position = new Vector3(startX, basedY + padding + underlineHeight / 2, 0),
+                    color = richInfo.Color, // 划线颜色
                 };
-                underlineVerts[1] = new UIVertex
+                lineVerts[1] = new UIVertex
                 {
-                    position = new Vector3(endX, endY - padding, 0),
+                    position = new Vector3(endX, basedY + padding + underlineHeight / 2, 0),
                     color = richInfo.Color,
                 };
-                underlineVerts[2] = new UIVertex
+                lineVerts[2] = new UIVertex
                 {
-                    position = new Vector3(endX, endY - padding - underlineHeight, 0),
+                    position = new Vector3(endX, basedY + padding - underlineHeight / 2, 0),
                     color = richInfo.Color,
                 };
-                underlineVerts[3] = new UIVertex
+                lineVerts[3] = new UIVertex
                 {
-                    position = new Vector3(startX, endY - padding - underlineHeight, 0),
+                    position = new Vector3(startX, basedY + padding - underlineHeight / 2, 0),
                     color = richInfo.Color,
                 };
                 
-                result.Add(underlineVerts);
+                result.Add(lineVerts);
             }
 
             return result;

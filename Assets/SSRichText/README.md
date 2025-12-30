@@ -1,5 +1,5 @@
 # SSRichText
- Unity UGUI RichText
+Unity UGUI RichText
 
 实现思路来自：[ZUIRichText](https://github.com/172672672/UGUI-RichText)
 
@@ -23,6 +23,7 @@ Unity版本：Unity2020或以上经过测试可用，Unity2019及以下或Unity6
 |         \<i>\</i>         | 斜体  |                   unity原生                   |
 |      \<size>\</size>      | 大小  |                   unity原生                   |
 |   \<color=red>\</color>   | 颜色  |                   unity原生                   |
+|           \<s>\</s>           | 删除线 |   \<outline=red>或\<outline=#ffffffff>设置颜色   |
 | \<outline=red>\</outline> | 描边  |   \<outline=red>或\<outline=#ffffffff>设置颜色   |
 |    \<shadow>\</shadow>    | 阴影  |                     ...                     |
 |       \<icon=xxxx/>       | 图标  |             需要配合IconProvider使用              |
@@ -61,8 +62,9 @@ Unity版本：Unity2020或以上经过测试可用，Unity2019及以下或Unity6
 - [x] link标签
 - [x] 富文本点击事件
 - [x] GIF显示在富文本
-- [ ] GIF的文本渲染到帧图上
+- [x] s删除线标签
+- [ ] <s>GIF的文本渲染到帧图上</s>(文本扩展块**不参与画面渲染**)
 
 # 效果图
 
-![效果](DocImages/PixPin_2024-12-14_16-20-52.png)
+![效果](DocImages/PixPin_2025-12-30_17-30-12.png)
