@@ -389,12 +389,12 @@ RectTransform:
   - {fileID: 424444936}
   - {fileID: 139390684}
   m_Father: {fileID: 1463646796}
-  m_RootOrder: 1
+  m_RootOrder: 2
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -550, y: -43}
-  m_SizeDelta: {x: 761.7671, y: 865.5923}
+  m_AnchoredPosition: {x: -527.4138, y: -7.1191}
+  m_SizeDelta: {x: 806.9395, y: 999.5296}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &741103082
 MonoBehaviour:
@@ -429,7 +429,9 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "Unity<size=40><color=yellow>\u539F\u751F\u7684</color>\u6807\u7B7E</size><b>Bold</b>+<i>Italic</i>\n<i>icon</i>-><icon=Test1/><-<outline=blue>outline<outline>!</outline>111111<s>222</s>\n<shadow>Shadow!</shadow><icon=Test2/><icon=Test3/><icon=Test2/><underline=red>11111111111p1111111111</underline><gif=GIF1/><gif=GIF2/><gif=GIF1/>\n<icon=Test2/><icon=Test4/><icon=Test3/>\u5927icon<size=40><shadow><icon=Test4/></shadow></size>\n\u8FD8\u6709\u94FE\u63A5\u53EF\u4EE5\u70B9\uFF1A<underline=green><link=https://www.baidu.com>\u767E\u5EA6</link></underline>\n<shadow><icon=TestAlpha1/><icon=TestAlpha2/><icon=TestAlpha3/><icon=TestAlpha4/></shadow>"
+  m_Text: "Unity<size=40><color=yellow>\u539F\u751F\u7684</color>\u6807\u7B7E</size><b>Bold</b>+<i>Italic</i>\n<i>icon</i>-><icon=Test1/><-<outline=blue>outline<outline>!</outline>111111<s>222</s>\n<shadow>Shadow!</shadow><icon=Test2/><icon=Test3/><icon=Test2/><underline=red>11111111111p1111111111</underline><gif=GIF1/><gif=GIF2/><gif=GIF1/>\n<icon=Test2/><icon=Test4/><icon=Test3/>\u5927icon<size=40><shadow><icon=Test4/></shadow></size>\n\u8FD8\u6709\u94FE\u63A5\u53EF\u4EE5\u70B9\uFF1A<underline=green><link=https://www.baidu.com>\u767E\u5EA6</link></underline>\n<shadow><icon=TestAlpha1/><icon=TestAlpha2/><icon=TestAlpha3/><icon=TestAlpha4/></shadow><gradient
+    lt=red rt=blue lb=green rb=yellow>1397513447oh~MyGod4565478</gradient>\n\n<gradient
+    lt=red rt=blue lb=#ff99ff rb=yellow>\u4F60\u770B\u770B\u8FD9\u662F\u627E\u8C01\u8BF4\u7406\u554A</gradient>"
 --- !u!222 &741103083
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -654,7 +656,7 @@ RectTransform:
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 1463646796}
-  m_RootOrder: 2
+  m_RootOrder: 3
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
@@ -873,9 +875,9 @@ RectTransform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 1414195377}
+  - {fileID: 1614979410}
   - {fileID: 741103081}
   - {fileID: 1343013879}
-  - {fileID: 1614979410}
   m_Father: {fileID: 0}
   m_RootOrder: 1
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -930,7 +932,7 @@ RectTransform:
   m_Children:
   - {fileID: 945518331}
   m_Father: {fileID: 1463646796}
-  m_RootOrder: 3
+  m_RootOrder: 1
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}

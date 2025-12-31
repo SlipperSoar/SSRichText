@@ -17,19 +17,20 @@ Unity版本：Unity2020或以上经过测试可用，Unity2019及以下或Unity6
 
 支持的富文本标签：
 
-|            标签             | 效果  |                     注释                      |
-|:-------------------------:|:---:|:-------------------------------------------:|
-|         \<b>\</b>         | 粗体  |                   unity原生                   |
-|         \<i>\</i>         | 斜体  |                   unity原生                   |
-|      \<size>\</size>      | 大小  |                   unity原生                   |
-|   \<color=red>\</color>   | 颜色  |                   unity原生                   |
-|           \<s>\</s>           | 删除线 |   颜色与字体颜色相同，线宽根据字体大小动态变化   |
-| \<outline=red>\</outline> | 描边  |   \<outline=red>或\<outline=#ffffffff>设置颜色   |
-|    \<shadow>\</shadow>    | 阴影  |                     ...                     |
-|       \<icon=xxxx/>       | 图标  |             需要配合IconProvider使用              |
-| \<underline=red>\</underline> | 下划线 | \<underline=red>或\<underline=#ffffffff>设置颜色 |
-|    \<link=url>\</link>    | 链接  |               url可以填写具体的链接地址                |
-|       \<gif=xxxx/>        | 动图  |        需要配合GifDecoder和LoadManager使用         |
+|                         标签                          | 效果  |                     注释                      |
+|:---------------------------------------------------:|:---:|:-------------------------------------------:|
+|                      \<b>\</b>                      | 粗体  |                   unity原生                   |
+|                      \<i>\</i>                      | 斜体  |                   unity原生                   |
+|                   \<size>\</size>                   | 大小  |                   unity原生                   |
+|                \<color=red>\</color>                | 颜色  |                   unity原生                   |
+|                      \<s>\</s>                      | 删除线 |           颜色与字体颜色相同，线宽根据字体大小动态变化            |
+|              \<outline=red>\</outline>              | 描边  |   \<outline=red>或\<outline=#ffffffff>设置颜色   |
+|                 \<shadow>\</shadow>                 | 阴影  |                     ...                     |
+|                    \<icon=xxxx/>                    | 图标  |             需要配合IconProvider使用              |
+|            \<underline=red>\</underline>            | 下划线 | \<underline=red>或\<underline=#ffffffff>设置颜色 |
+|                 \<link=url>\</link>                 | 链接  |               url可以填写具体的链接地址                |
+|                    \<gif=xxxx/>                     | 动图  |        需要配合GifDecoder和LoadManager使用         |
+| \<gradient lt=red rt=red lb=red rb=red>\</gradient> | 渐变  |               需要填写四个顶点（四角）的颜色               |
 
 支持富文本点击事件：
 
@@ -64,8 +65,8 @@ Unity版本：Unity2020或以上经过测试可用，Unity2019及以下或Unity6
 - [x] GIF显示在富文本
 - [x] s删除线标签
 - [ ] <s>GIF的文本渲染到帧图上</s>(文本扩展块**不参与画面渲染**)
-- [ ] gradient渐变
+- [x] gradient渐变
 
 # 效果图
 
-![效果](DocImages/PixPin_2025-12-30_17-30-12.png)
+![效果](DocImages/PixPin_2025-12-31_18-12-58.png)

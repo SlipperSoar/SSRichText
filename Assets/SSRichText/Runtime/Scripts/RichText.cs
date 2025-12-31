@@ -41,6 +41,9 @@ namespace SS.UIComponent
             /// <summary>字体大小</summary>
             Size,
 
+            /// <summary>渐变</summary>
+            Gradient,
+
             /// <summary>描边</summary>
             Outline,
 
@@ -126,6 +129,14 @@ namespace SS.UIComponent
             /// <summary>基准位置</summary>
             public LineBasedPos BasedPos;
         }
+        
+        public class GradientRichInfo : RichInfo
+        {
+            public Color LeftTopColor;
+            public Color RightTopColor;
+            public Color LeftBottomColor;
+            public Color RightBottomColor;
+        }
 
         #endregion
 
@@ -149,8 +160,6 @@ namespace SS.UIComponent
         };
 
         #region regex
-
-        private static readonly Regex IconRegex = new Regex(@"<icon=([a-zA-Z0-9_\-\(\)\.]+)/>");
 
         // white space
         private readonly Regex WhiteSpaceRegex = new Regex(@"\s+");
@@ -184,6 +193,16 @@ namespace SS.UIComponent
         private static readonly Regex SizeEndRegex = new Regex(SizeEndRegexText);
 
         // 追加的富文本
+        // 渐变
+        private const string GradientRegexText = @"<gradient\s+([^>]+)>";
+
+        private static readonly string GradientColorRegexText = $"(lt|rt|lb|rb)=({GetColorRegexGroup()})";
+
+        private const string GradientEndRegexText = @"</gradient>";
+        private static readonly Regex GradientRegex = new Regex(GradientRegexText, RegexOptions.IgnoreCase);
+        private static readonly Regex GradientColorRegex = new Regex(GradientColorRegexText);
+        private static readonly Regex GradientEndRegex = new Regex(GradientEndRegexText);
+        
         // 描边
         private static readonly string OutlineRegexText =
             @"<outline=((#[0-9a-f]{8})|(#[0-9a-f]{6})|(" + GetColorWords() + @"))>";
@@ -218,6 +237,9 @@ namespace SS.UIComponent
         private const string LinkEndRegexText = @"</link>";
         private static readonly Regex LinkRegex = new Regex(LinkRegexText);
         private static readonly Regex LinkEndRegex = new Regex(LinkEndRegexText);
+
+        // 图标
+        private static readonly Regex IconRegex = new Regex(@"<icon=([a-zA-Z0-9_\-\(\)\.]+)/>");
 
         // GIF动图
         private static readonly Regex GifRegex = new Regex(@"<gif=([a-zA-Z0-9_\-\(\)\.]+)/>");
@@ -414,6 +436,9 @@ namespace SS.UIComponent
                         drawingLineInfos.Add(richInfo);
                     }
                         break;
+                    case RichType.Gradient:
+                        ApplyGradientEffect(richInfo, verts, vertCount);
+                        break;
                 }
             }
 
@@ -608,16 +633,6 @@ namespace SS.UIComponent
             var richInfos = new List<RichInfo>();
             var tags = new List<TagInfo>();
 
-            Color GetColor(string colorStr)
-            {
-                if (!Colors.TryGetValue(colorStr, out var tagColor))
-                {
-                    ColorUtility.TryParseHtmlString(colorStr, out tagColor);
-                }
-
-                return tagColor;
-            }
-
             // 图标
             tags.AddRange(GetTags(resultText, IconRegex, RichType.Icon, true, (str, info) =>
             {
@@ -660,6 +675,11 @@ namespace SS.UIComponent
             tags.AddRange(GetTags(resultText, BoldRegex, RichType.Bold));
             tags.AddRange(GetTags(resultText, BoldEndRegex, RichType.Bold, isCloseTag: true));
 
+            // 渐变
+            tags.AddRange(GetTags(resultText, GradientRegex, RichType.Gradient,
+                paramProcessor: (str, info) => info.Content = str));
+            tags.AddRange(GetTags(resultText, GradientEndRegex, RichType.Gradient, isCloseTag: true));
+
             // 下划线
             tags.AddRange(GetTags(resultText, UnderlineRegex, RichType.Underline,
                 paramProcessor: (str, info) => { info.Color = GetColor(str); }));
@@ -695,6 +715,24 @@ namespace SS.UIComponent
                     {
                         spaceIndexes.Dequeue();
                         offset++;
+                        if (spaceIndexes.Count > 0)
+                        {
+                            spaceIndex = spaceIndexes.Peek();
+                        }
+                        else
+                        {
+                            break;
+                        }
+                    }
+                }
+
+                // 不能包含标签中的空格
+                if (spaceIndexes.Count > 0)
+                {
+                    var spaceIndex = spaceIndexes.Peek();
+                    while (tag.Index < spaceIndex && tag.Index + tag.Length > spaceIndex)
+                    {
+                        spaceIndexes.Dequeue();
                         if (spaceIndexes.Count > 0)
                         {
                             spaceIndex = spaceIndexes.Peek();
@@ -747,6 +785,7 @@ namespace SS.UIComponent
                         continue;
                     }
 
+                    // top：开启标签，tag：闭合标签
                     var top = tagStack.Pop();
                     if (top.Type != tag.Type)
                     {
@@ -803,6 +842,20 @@ namespace SS.UIComponent
                                 LineHeight = Mathf.Max(fontSize / 8f, 1.5f),
                                 BasedPos = LineBasedPos.Middle
                             };
+                            break;
+                        case RichType.Gradient:
+                        {
+                            // 获取渐变的四个颜色
+                            var gradientRichInfo = new GradientRichInfo()
+                            {
+                                Type = tag.Type,
+                                StartIndex = tag.Index - offset,
+                                Color = color,
+                            };
+                            
+                            ProcessGradientParams(tag.Content, gradientRichInfo);
+                            richInfo = gradientRichInfo;
+                        }
                             break;
                         default:
                             richInfo = new RichInfo()
@@ -919,6 +972,57 @@ namespace SS.UIComponent
             return string.Join("|", Colors.Keys);
         }
 
+        private static string GetColorRegexGroup()
+        {
+            return "(#[0-9a-f]{8})|(#[0-9a-f]{6})|(" + GetColorWords() + @")";
+        }
+
+        /// <summary>
+        /// 获取渐变颜色组
+        /// </summary>
+        /// <param name="content">参数字符串</param>
+        /// <param name="gradientRichInfo">渐变富文本信息</param>
+        /// <returns>渐变颜色数组，依次为lt、rt、lb、rb</returns>
+        private static void ProcessGradientParams(string content, GradientRichInfo gradientRichInfo)
+        {
+            var matches = GradientColorRegex.Matches(content);
+            foreach (Match match in matches)
+            {
+                var groups = match.Groups;
+                // 0: 原字符串，1：第一个括号，2：第二个括号 ...
+                switch (groups[1].Value)
+                {
+                    case "lt":
+                        gradientRichInfo.LeftTopColor = GetColor(groups[2].Value);
+                        break;
+                    case "rt":
+                        gradientRichInfo.RightTopColor = GetColor(groups[2].Value);
+                        break;
+                    case "lb":
+                        gradientRichInfo.LeftBottomColor = GetColor(groups[2].Value);
+                        break;
+                    case "rb":
+                        gradientRichInfo.RightBottomColor = GetColor(groups[2].Value);
+                        break;
+                }
+            }
+        }
+
+        /// <summary>
+        /// 字符串转换为颜色
+        /// </summary>
+        /// <param name="colorStr">颜色字符串</param>
+        /// <returns>颜色</returns>
+        private static Color GetColor(string colorStr)
+        {
+            if (!Colors.TryGetValue(colorStr, out var tagColor))
+            {
+                ColorUtility.TryParseHtmlString(colorStr, out tagColor);
+            }
+
+            return tagColor;
+        }
+        
         /// <summary>
         /// 投影效果
         /// </summary>
@@ -1216,6 +1320,90 @@ namespace SS.UIComponent
             }
 
             return result;
+        }
+
+        private void ApplyGradientEffect(RichInfo richInfo, IList<UIVertex> verts, int vertCount)
+        {
+            // 先检查能不能被渲染出来，不能那就算了
+            if (richInfo.StartIndex * 4 >= vertCount)
+            {
+                return;
+            }
+            
+            // 转换为渐变专用的类型
+            if (richInfo is not GradientRichInfo gradientRichInfo)
+            {
+                Debug.LogError($"Cant Cast to GradientRichInfo: {richInfo}");
+                return;
+            }
+
+            Color GetColor(float x, float y)
+            {
+                // 先获取x轴颜色
+                var topColor = Color.Lerp(gradientRichInfo.LeftTopColor, gradientRichInfo.RightTopColor, x);
+                var bottomColor = Color.Lerp(gradientRichInfo.LeftBottomColor, gradientRichInfo.RightBottomColor, x);
+
+                var finalColor = Color.Lerp(bottomColor, topColor, y);
+                return finalColor;
+            }
+
+            var count = richInfo.Rects.Count;
+            // 总有效长度，用于计算每个矩形生效的渐变范围
+            float totalLength = richInfo.RectIndexes.Sum(index => index[1] - index[0]);
+            float rateOffset = 0;
+            for (int i = 0; i < count; i++)
+            {
+                var rectIndex = richInfo.RectIndexes[i];
+                var gradientRate = (rectIndex[1] - rectIndex[0]) / totalLength;
+                // 计算该矩形对应的坐标范围
+                // 顶点顺序是左上顺时针到左下
+                int startAt = rectIndex[0] * 4;
+                // 最后一个顶点索引
+                int endAt = Mathf.Min(rectIndex[1] * 4, vertCount) - 1;
+                float xMin, xMax, yMin, yMax;
+                var startPos = verts[startAt].position;
+                xMin = startPos.x;
+                xMax = startPos.x;
+                yMin = startPos.y;
+                yMax = startPos.y;
+                for (int j = startAt + 1; j < endAt; j++)
+                {
+                    // 此位置是基于pivot的位置
+                    var pos = verts[j].position;
+                    xMin = Mathf.Min(pos.x, xMin);
+                    xMax = Mathf.Max(pos.x, xMax);
+                    yMin = Mathf.Min(pos.y, yMin);
+                    yMax = Mathf.Max(pos.y, yMax);
+                }
+
+                for (int j = rectIndex[0]; j < rectIndex[1]; j++)
+                {
+                    // 顶点顺序是左上顺时针到左下
+                    int start = j * 4;
+                    // 左上
+                    var vt = verts[start];
+                    vt.color = GetColor(rateOffset + gradientRate * (vt.position.x - xMin) / (xMax - xMin),
+                        (vt.position.y - yMin) / (yMax - yMin));
+                    verts[start] = vt;
+                    // 右上
+                    vt = verts[start + 1];
+                    vt.color = GetColor(rateOffset + gradientRate * (vt.position.x - xMin) / (xMax - xMin),
+                        (vt.position.y - yMin) / (yMax - yMin));
+                    verts[start + 1] = vt;
+                    // 右下
+                    vt = verts[start + 2];
+                    vt.color = GetColor(rateOffset + gradientRate * (vt.position.x - xMin) / (xMax - xMin),
+                        (vt.position.y - yMin) / (yMax - yMin));
+                    verts[start + 2] = vt;
+                    // 左下
+                    vt = verts[start + 3];
+                    vt.color = GetColor(rateOffset + gradientRate * (vt.position.x - xMin) / (xMax - xMin),
+                        (vt.position.y - yMin) / (yMax - yMin));
+                    verts[start + 3] = vt;
+                }
+
+                rateOffset += gradientRate;
+            }
         }
 
         /// <summary>
