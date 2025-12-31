@@ -1248,7 +1248,7 @@ namespace SS.UIComponent
         }
 
         /// <summary>
-        /// 下划线效果
+        /// 划线效果
         /// </summary>
         private List<UIVertex[]> ApplyDrawingLineEffect(RichInfo richInfo, IList<UIVertex> verts, int vertCount)
         {
@@ -1269,50 +1269,61 @@ namespace SS.UIComponent
                 var rectIndex = richInfo.RectIndexes[i];
 
                 // 顶点顺序是左上顺时针到左下
-                int start = rectIndex[0] * 4;
+                int startAt = rectIndex[0] * 4;
                 // 要添加下划线的最后一个字符的右下角顶点索引
-                int end = Mathf.Min(rectIndex[1] * 4, vertCount) - 2;
+                int endAt = Mathf.Min(rectIndex[1] * 4, vertCount) - 1;
 
+                float xMin, xMax, yMin, yMax;
+                var startPos = verts[startAt].position;
+                xMin = startPos.x;
+                xMax = startPos.x;
+                yMin = startPos.y;
+                yMax = startPos.y;
+                for (int j = startAt + 1; j < endAt; j++)
+                {
+                    // 此位置是基于pivot的位置
+                    var pos = verts[j].position;
+                    xMin = Mathf.Min(pos.x, xMin);
+                    xMax = Mathf.Max(pos.x, xMax);
+                    yMin = Mathf.Min(pos.y, yMin);
+                    yMax = Mathf.Max(pos.y, yMax);
+                }
+                
                 // 划线的四个顶点
                 var lineVerts = new UIVertex[4];
-                // 起止坐标
-                float startX = verts[start].position.x;
-                float startY = verts[start].position.y;
-                float endX = verts[end].position.x;
-                float endY = verts[end].position.y;
                 float basedY = 0;
                 switch (lineRichInfo.BasedPos)
                 {
                     case LineBasedPos.Top:
-                        basedY = startY;
+                        basedY = yMax;
                         break;
                     case LineBasedPos.Middle:
-                        basedY = (startY + endY) / 2;
+                        basedY = (yMax + yMin) / 2;
                         break;
                     case LineBasedPos.Bottom:
-                        basedY = endY;
+                        basedY = yMin;
                         break;
                 }
 
-                // 计算下划线的四个顶点
+                // 计算划线的四个顶点
                 lineVerts[0] = new UIVertex
                 {
-                    position = new Vector3(startX, basedY + padding + underlineHeight / 2, 0),
+                    position = new Vector3(xMin, basedY + padding + underlineHeight / 2, 0),
                     color = richInfo.Color, // 划线颜色
                 };
                 lineVerts[1] = new UIVertex
                 {
-                    position = new Vector3(endX, basedY + padding + underlineHeight / 2, 0),
+                    position = new Vector3(xMax, basedY + padding + underlineHeight / 2, 0),
                     color = richInfo.Color,
                 };
                 lineVerts[2] = new UIVertex
                 {
-                    position = new Vector3(endX, basedY + padding - underlineHeight / 2, 0),
+                    position = new Vector3(xMax, basedY + padding - underlineHeight / 2, 0),
                     color = richInfo.Color,
                 };
                 lineVerts[3] = new UIVertex
                 {
-                    position = new Vector3(startX, basedY + padding - underlineHeight / 2, 0),
+                    position = new Vector3(xMin, basedY + padding - underlineHeight / 2, 0),
                     color = richInfo.Color,
                 };
 

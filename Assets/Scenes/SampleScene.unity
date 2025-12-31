@@ -429,7 +429,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "Unity<size=40><color=yellow>\u539F\u751F\u7684</color>\u6807\u7B7E</size><b>Bold</b>+<i>Italic</i>\n<i>icon</i>-><icon=Test1/><-<outline=blue>outline<outline>!</outline>111111<s>222</s>\n<shadow>Shadow!</shadow><icon=Test2/><icon=Test3/><icon=Test2/><underline=red>11111111111p1111111111</underline><gif=GIF1/><gif=GIF2/><gif=GIF1/>\n<icon=Test2/><icon=Test4/><icon=Test3/>\u5927icon<size=40><shadow><icon=Test4/></shadow></size>\n\u8FD8\u6709\u94FE\u63A5\u53EF\u4EE5\u70B9\uFF1A<underline=green><link=https://www.baidu.com>\u767E\u5EA6</link></underline>\n<shadow><icon=TestAlpha1/><icon=TestAlpha2/><icon=TestAlpha3/><icon=TestAlpha4/></shadow><gradient
+  m_Text: "Unity<size=40><color=yellow>\u539F\u751F\u7684</color>\u6807\u7B7E</size><b>Bold</b>+<i>Italic</i>\n<i>icon</i>-><icon=Test1/><-<outline=blue>outline<outline>!</outline>111111<s>222</s>\n<shadow>Shadow!</shadow><icon=Test2/><icon=Test3/><icon=Test2/><underline=red>111\u554A\u54C8\u54C81p1111111111</underline><gif=GIF1/><gif=GIF2/><gif=GIF1/>\n<icon=Test2/><icon=Test4/><icon=Test3/>\u5927icon<size=80><shadow><icon=Test4/></shadow></size>\n\u8FD8\u6709\u94FE\u63A5\u53EF\u4EE5\u70B9\uFF1A<underline=green><link=https://www.baidu.com>\u767E\u5EA6</link></underline>\n<shadow><icon=TestAlpha1/><icon=TestAlpha2/><icon=TestAlpha3/><icon=TestAlpha4/></shadow><gradient
     lt=red rt=blue lb=green rb=yellow>1397513447oh~MyGod4565478</gradient>\n\n<gradient
     lt=red rt=blue lb=#ff99ff rb=yellow>\u4F60\u770B\u770B\u8FD9\u662F\u627E\u8C01\u8BF4\u7406\u554A</gradient>"
 --- !u!222 &741103083
