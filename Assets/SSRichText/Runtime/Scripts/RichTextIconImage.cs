@@ -251,11 +251,14 @@ namespace SS.UIComponent
                 verts[3].uv0 = new Vector2(uv.x, uv.y);
 
                 var gifName = gif.Key.Content;
-                GifLoadManager.Instance.LoadGif(gifName, frames =>
+                if (Application.isPlaying)
                 {
-                    RefreshGifOffsetScale(gif.Key);
-                    GifLoadManager.Instance.AddGifPlayer(gifName, PlayGif);
-                });
+                    GifLoadManager.Instance.LoadGif(gifName, frames =>
+                    {
+                        RefreshGifOffsetScale(gif.Key);
+                        GifLoadManager.Instance.AddGifPlayer(gifName, PlayGif);
+                    });
+                }
             }
 
             RenderTexture.active = prevRT;
@@ -466,10 +469,13 @@ namespace SS.UIComponent
             vertices[1].uv0 = new Vector4(1, 1);
             vertices[2].uv0 = new Vector4(1, 0);
             vertices[3].uv0 = new Vector4(0, 0);
-            GifLoadManager.Instance.LoadGif(richInfo.Content, frames =>
+            if (Application.isPlaying)
             {
-                GifLoadManager.Instance.AddGifPlayer(richInfo.Content, PlaySingleGif);
-            });
+                GifLoadManager.Instance.LoadGif(richInfo.Content, frames =>
+                {
+                    GifLoadManager.Instance.AddGifPlayer(richInfo.Content, PlaySingleGif);
+                });
+            }
         }
 
         private void ApplyIconShadow(UIVertex[] verts, VertexHelper toFill)
