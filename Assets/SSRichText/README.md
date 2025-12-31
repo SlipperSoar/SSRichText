@@ -69,4 +69,4 @@ Unity版本：Unity2020或以上经过测试可用，Unity2019及以下或Unity6
 
 # 效果图
 
-![效果](DocImages/PixPin_2025-12-31_18-12-58.png)
+![效果](DocImages/PixPin_2025-12-31_18-25-59.png)
