@@ -2,6 +2,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Events;
 
 namespace SS.UIComponent
 {
@@ -17,6 +18,30 @@ namespace SS.UIComponent
             public List<GifData> Data;
             public float LastUseTime;
             public Action<List<GifData>> OnComplete;
+        }
+        
+        private class GifPlayer
+        {
+            public string GifName;
+            public float CountDown;
+            public int Index;
+            public UnityEvent<string, GifData> Player;
+
+            public void Update(List<GifData> gifDatas)
+            {
+                var gifData = gifDatas[Index];
+                if (CountDown >= gifData.DelaySecond)
+                {
+                    CountDown -= gifData.DelaySecond;
+                    Player.Invoke(GifName, gifData);
+                    Index++;
+                    Index %= gifDatas.Count;
+                }
+                else
+                {
+                    CountDown += Time.deltaTime;
+                }
+            }
         }
 
         #endregion
@@ -62,6 +87,7 @@ namespace SS.UIComponent
         private Dictionary<string, bool> gifLoadStatus = new Dictionary<string, bool>();
         private Dictionary<string, GifLoadData> gifDatas = new Dictionary<string, GifLoadData>();
         private Dictionary<string, Vector2Int> gifSizes = new Dictionary<string, Vector2Int>();
+        private Dictionary<string, GifPlayer> gifPlayers = new Dictionary<string, GifPlayer>();
 
         private int loadingCount = 0;
         private Queue<(string gifName, bool useIO, bool forceBgColorTransparent)> waitingQueue = new Queue<(string, bool, bool)>();
@@ -73,6 +99,25 @@ namespace SS.UIComponent
 
         private void Update()
         {
+            // 进行GIF的播放
+            if (gifPlayers.Count > 0)
+            {
+                foreach (var gifPlayer in gifPlayers)
+                {
+                    var gifName = gifPlayer.Key;
+                    if (gifLoadStatus.TryGetValue(gifName, out var isLoaded))
+                    {
+                        if (isLoaded)
+                        {
+                            var player = gifPlayer.Value;
+                            var gifData = gifDatas[gifName];
+                            gifData.LastUseTime = Time.time;
+                            player.Update(gifData.Data);
+                        }
+                    }
+                }
+            }
+            
             var removeList = new List<string>(gifDatas.Count);
             // 按时间清理不再使用的GIF数据
             foreach (var gifData in gifDatas)
@@ -163,6 +208,51 @@ namespace SS.UIComponent
             }
         }
 
+        /// <summary>
+        /// 添加Gif播放器
+        /// </summary>
+        /// <param name="gifName">gif名</param>
+        /// <param name="onUpdate">更新监听</param>
+        public void AddGifPlayer(string gifName, UnityAction<string, GifData> onUpdate)
+        {
+            GifPlayer gifPlayer;
+            if (gifPlayers.TryGetValue(gifName, out gifPlayer))
+            {
+                gifPlayer.Player.AddListener(onUpdate);
+            }
+            else
+            {
+                gifPlayer = new GifPlayer()
+                {
+                    GifName = gifName,
+                    Player = new UnityEvent<string, GifData>()
+                };
+                gifPlayer.Player.AddListener(onUpdate);
+                gifPlayers.Add(gifName, gifPlayer);
+            }
+        }
+
+        /// <summary>
+        /// 移除Gif播放器
+        /// </summary>
+        /// <param name="gifName">gif名</param>
+        /// <param name="onUpdate">更新监听</param>
+        public void RemoveGifPlayer(string gifName, UnityAction<string, GifData> onUpdate)
+        {
+            if (gifPlayers.TryGetValue(gifName, out var gifPlayer))
+            {
+                gifPlayer.Player.RemoveListener(onUpdate);
+                if (gifPlayer.Player.GetPersistentEventCount() == 0)
+                {
+                    gifPlayers.Remove(gifName);
+                }
+            }
+            else
+            {
+                Debug.LogError($"GifPlayer not found: {gifName}");
+            }
+        }
+        
         #endregion
 
         #region Private Methods

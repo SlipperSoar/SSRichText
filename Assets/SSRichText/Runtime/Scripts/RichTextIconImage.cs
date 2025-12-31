@@ -23,13 +23,13 @@ namespace SS.UIComponent
         private List<RichInfo> _sprites;
         private List<UIVertex[]> _vertices;
         private Dictionary<RichInfo, UIVertex[]> _gifs;
+        private Dictionary<string, Vector4> _gifOffsetSclaes = new Dictionary<string, Vector4>();
         private LinkedList<int> _iconShadows;
         private static readonly int OffsetScale = Shader.PropertyToID("_OffsetScale");
 
         private int textureWidth;
         private int textureHeight;
         private RenderTexture rt;
-        private Dictionary<string, Coroutine> gifCoroutines = new();
         private Material blitMaterial;
 
         #endregion
@@ -41,9 +41,9 @@ namespace SS.UIComponent
             _sprites = iconInfos;
             _vertices = vertices;
             _iconShadows = iconShadows;
-            _gifs = gifs;
             // 先把上次的停了（如果有）
-            StopAllGifCoroutines();
+            StopAllGifs();
+            _gifs = gifs;
             if (_sprites.Count == 1 && _gifs.Count == 0)
             {
                 ApplySingleSprite(icons[_sprites[0].Content].texture);
@@ -70,7 +70,7 @@ namespace SS.UIComponent
             _sprites = null;
             _gifs = null;
             _iconShadows = null;
-            StopAllGifCoroutines();
+            StopAllGifs();
             SetAllDirty();
         }
         
@@ -139,7 +139,7 @@ namespace SS.UIComponent
         {
             base.OnDestroy();
             
-            StopAllGifCoroutines();
+            StopAllGifs();
         }
 
         #endregion
@@ -253,12 +253,8 @@ namespace SS.UIComponent
                 var gifName = gif.Key.Content;
                 GifLoadManager.Instance.LoadGif(gifName, frames =>
                 {
-                    if (gifCoroutines.ContainsKey(gifName))
-                    {
-                        return;
-                    }
-
-                    gifCoroutines.Add(gifName, StartCoroutine(PlayGif(gif.Key, frames)));
+                    RefreshGifOffsetScale(gif.Key);
+                    GifLoadManager.Instance.AddGifPlayer(gifName, PlayGif);
                 });
             }
 
@@ -472,7 +468,7 @@ namespace SS.UIComponent
             vertices[3].uv0 = new Vector4(0, 0);
             GifLoadManager.Instance.LoadGif(richInfo.Content, frames =>
             {
-                gifCoroutines.Add(richInfo.Content, StartCoroutine(PlaySingleGif(frames)));
+                GifLoadManager.Instance.AddGifPlayer(richInfo.Content, PlaySingleGif);
             });
         }
 
@@ -576,95 +572,57 @@ namespace SS.UIComponent
             return os;
         }
 
-        private void StopAllGifCoroutines()
+        private void StopAllGifs()
         {
-            if (gifCoroutines == null)
+            if (_gifs == null)
             {
                 return;
             }
-            
-            if (gifCoroutines.Count > 0)
+
+            if (_gifs.Count == 1)
             {
-                foreach (var gifCoroutine in gifCoroutines.Where(gifCoroutine => gifCoroutine.Value != null))
+                foreach (var gif in _gifs)
                 {
-                    StopCoroutine(gifCoroutine.Value);
+                    GifLoadManager.Instance.RemoveGifPlayer(gif.Key.Content, PlaySingleGif);
                 }
             }
-            
-            gifCoroutines.Clear();
-        }
-        
-        #endregion
-        
-        #region Coroutine
-
-        IEnumerator PlaySingleGif(List<GifData> frames)
-        {
-            var index = 1;
-            var countDown = 0f;
-        
-            texture = frames[0].FrameTexture;
-        
-            while (true)
+            else
             {
-                if (index >= frames.Count)
+                foreach (var gif in _gifs)
                 {
-                    index %= frames.Count;
+                    GifLoadManager.Instance.RemoveGifPlayer(gif.Key.Content, PlayGif);
                 }
-            
-                var frame = frames[index];
-                if (countDown >= frame.DelaySecond)
-                {
-                    texture = frame.FrameTexture;
-                    countDown -= frame.DelaySecond;
-                    index++;
-                }
-            
-                countDown += Time.deltaTime;
-            
-                yield return null;
             }
         }
-        
-        IEnumerator PlayGif(RichInfo gifInfo, List<GifData> frames)
-        {
-            var index = 1;
-            var countDown = 0f;
 
+        private void PlaySingleGif(string gifName, GifData gifData)
+        {
+            texture = gifData.FrameTexture;
+        }
+
+        private void RefreshGifOffsetScale(RichInfo gifInfo)
+        {
             if (!_gifs.TryGetValue(gifInfo, out var verts))
             {
 #if UNITY_EDITOR
                 Debug.Log($"Can't Play Gif: {gifInfo.Content}, not found in _gifs");
 #endif
-                yield break;
+                return;
             }
 
             var offsetScale = UV2OffsetScale(verts[3].uv0.x, verts[3].uv0.y, verts[1].uv0.x, verts[1].uv0.y);
 #if UNITY_EDITOR
             Debug.Log($"Play Gif: {gifInfo.Content}, offset and scale: {offsetScale}");
 #endif
-            blitMaterial.SetVector(OffsetScale, offsetScale);
-            Graphics.Blit(frames[0].FrameTexture, rt, blitMaterial);
-        
-            while (true)
+            _gifOffsetSclaes[gifInfo.Content] = offsetScale;
+        }
+
+        private void PlayGif(string gifName, GifData gifData)
+        {
+            if (_gifOffsetSclaes.TryGetValue(gifName, out var offsetScale))
             {
-                if (index >= frames.Count)
-                {
-                    index %= frames.Count;
-                }
-            
-                var frame = frames[index];
-                if (countDown >= frame.DelaySecond)
-                {
-                    blitMaterial.SetVector(OffsetScale, offsetScale);
-                    Graphics.Blit(frame.FrameTexture, rt, blitMaterial);
-                    countDown -= frame.DelaySecond;
-                    index++;
-                }
-            
-                countDown += Time.deltaTime;
-            
-                yield return null;
+                blitMaterial.SetVector(OffsetScale, offsetScale);
+                Graphics.Blit(gifData.FrameTexture, rt, blitMaterial);
             }
         }
 
