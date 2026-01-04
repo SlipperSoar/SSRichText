@@ -653,8 +653,7 @@ namespace SS.UIComponent
             tags.AddRange(GetTags(resultText, OutlineEndRegex, RichType.Outline, isCloseTag: true));
 
             // 阴影
-            tags.AddRange(GetTags(resultText, ShadowRegex, RichType.Shadow,
-                paramProcessor: (str, info) => { info.Color = GetColor(str); }));
+            tags.AddRange(GetTags(resultText, ShadowRegex, RichType.Shadow));
             tags.AddRange(GetTags(resultText, ShadowEndRegex, RichType.Shadow, isCloseTag: true));
 
             // 颜色
