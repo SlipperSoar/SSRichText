@@ -1022,6 +1022,13 @@ namespace SS.UIComponent
         {
             if (!Colors.TryGetValue(colorStr, out var tagColor))
             {
+                // 如果是7位代码，把最后一位补齐到8位
+                if (colorStr.Length == 8)
+                {
+                    colorStr += colorStr[7];
+                }
+
+                // 无法正确转换，则返回透明色（按理来说不可能的）
                 if (!ColorUtility.TryParseHtmlString(colorStr, out tagColor))
                 {
                     Debug.LogError($"cant parse str: {colorStr}");
