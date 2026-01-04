@@ -10,6 +10,7 @@ using System.Linq;
 using UnityEngine;
 using UnityEngine.UI;
 using RichInfo = SS.UIComponent.RichText.RichInfo;
+using ShadowRichInfo = SS.UIComponent.RichText.ShadowRichInfo;
 
 namespace SS.UIComponent
 {
@@ -24,7 +25,7 @@ namespace SS.UIComponent
         private List<UIVertex[]> _vertices;
         private Dictionary<RichInfo, UIVertex[]> _gifs;
         private Dictionary<string, Vector4> _gifOffsetSclaes = new Dictionary<string, Vector4>();
-        private LinkedList<int> _iconShadows;
+        private Dictionary<int, ShadowRichInfo> _iconShadows;
         private static readonly int OffsetScale = Shader.PropertyToID("_OffsetScale");
 
         private int textureWidth;
@@ -36,7 +37,7 @@ namespace SS.UIComponent
         
         #region Public Methods
 
-        public void SetIcons(List<RichInfo> iconInfos, Dictionary<string, Sprite> icons, List<UIVertex[]> vertices, LinkedList<int> iconShadows, Dictionary<RichInfo, UIVertex[]> gifs)
+        public void SetIcons(List<RichInfo> iconInfos, Dictionary<string, Sprite> icons, List<UIVertex[]> vertices, Dictionary<int, ShadowRichInfo> iconShadows, Dictionary<RichInfo, UIVertex[]> gifs)
         {
             _sprites = iconInfos;
             _vertices = vertices;
@@ -98,9 +99,9 @@ namespace SS.UIComponent
                 verts[2].color = color * info.Color;
                 verts[3].color = color * info.Color;
 
-                if (_iconShadows.Remove(info.StartIndex))
+                if (_iconShadows.TryGetValue(info.StartIndex, out var shadowRichInfo))
                 {
-                    ApplyIconShadow(verts, toFill);
+                    ApplyIconShadow(shadowRichInfo, verts, toFill);
                 }
                 else
                 {
@@ -124,9 +125,9 @@ namespace SS.UIComponent
                 verts[2].color = color * info.Color;
                 verts[3].color = color * info.Color;
 
-                if (_iconShadows.Remove(info.StartIndex))
+                if (_iconShadows.TryGetValue(info.StartIndex, out var shadowRichInfo))
                 {
-                    ApplyIconShadow(verts, toFill);
+                    ApplyIconShadow(shadowRichInfo, verts, toFill);
                 }
                 else
                 {
@@ -478,16 +479,21 @@ namespace SS.UIComponent
             }
         }
 
-        private void ApplyIconShadow(UIVertex[] verts, VertexHelper toFill)
+        private void ApplyIconShadow(ShadowRichInfo shadowRichInfo, UIVertex[] verts, VertexHelper toFill)
         {
             UIVertex vt;
             UIVertex[] shadowVerts = new UIVertex[4];
+            // 单个字符的四个顶点为[start, end)
+            var vt1 = verts[0];
+            var vt2 = verts[2];
+            // 从左上顺时针到左下，vt1.y > vt2.y
+            var offset = Mathf.Max(1, (vt1.position.y - vt2.position.y) / 16);
             for (int i = 0; i < 4; i++)
             {
                 vt = verts[i];
                 Vector3 v = vt.position;
-                v.x += -1;
-                v.y += 1;
+                v.x += offset * (shadowRichInfo.IsXPositive ? 1 : -1);
+                v.y += offset * (shadowRichInfo.IsYPositive ? 1 : -1);
                 vt.position = v;
                 var alpha = vt.color.a;
                 vt.color = Color.black;

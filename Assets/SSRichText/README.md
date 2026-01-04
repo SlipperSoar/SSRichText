@@ -25,7 +25,7 @@ Unity版本：Unity2020或以上经过测试可用，Unity2019及以下或Unity6
 |                \<color=red>\</color>                | 颜色  |                   unity原生                   |
 |                      \<s>\</s>                      | 删除线 |   颜色与字体颜色相同，线宽根据字体大小动态变化   |
 |              \<outline=red>\</outline>              | 描边  |   \<outline=red>或\<outline=#ffffffff>设置颜色   |
-|                 \<shadow>\</shadow>                 | 阴影  |                     ...                     |
+|               \<shadow=rt>\</shadow>                | 阴影  |       rt、lt、lb、rb分别表示左上、右上、左下、右下的阴影方向       |
 |                    \<icon=xxxx/>                    | 图标  |             需要配合IconProvider使用              |
 |            \<underline=red>\</underline>            | 下划线 | \<underline=red>或\<underline=#ffffffff>设置颜色 |
 |                 \<link=url>\</link>                 | 链接  |               url可以填写具体的链接地址                |

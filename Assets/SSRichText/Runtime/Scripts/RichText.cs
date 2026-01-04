@@ -117,6 +117,12 @@ namespace SS.UIComponent
             /// </summary>
             public List<int[]> RectIndexes;
         }
+        
+        public class ShadowRichInfo : RichInfo
+        {
+            public bool IsXPositive;
+            public bool IsYPositive;
+        }
 
         public class DrawingLineRichInfo : RichInfo
         {
@@ -212,7 +218,7 @@ namespace SS.UIComponent
         private static readonly Regex OutlineEndRegex = new Regex(OutlineEndRegexText);
 
         // 阴影
-        private const string ShadowRegexText = @"<shadow>";
+        private const string ShadowRegexText = @"<shadow=(lt|rt|lb|rb)>";
         private const string ShadowEndRegexText = @"</shadow>";
         private static readonly Regex ShadowRegex = new Regex(ShadowRegexText);
         private static readonly Regex ShadowEndRegex = new Regex(ShadowEndRegexText);
@@ -378,7 +384,6 @@ namespace SS.UIComponent
 
             // Apply the offset to the vertices
             var verts = cachedTextGenerator.verts;
-            var vertCount = verts.Count;
             var effectedVerts = new List<UIVertex>();
 
             // 处理富文本效果
@@ -390,12 +395,12 @@ namespace SS.UIComponent
             var gifs = new Dictionary<RichInfo, UIVertex[]>();
 
             // 图标阴影。这个每个元素只用一次就remove，用LinkedList可以避免数组整体移动，也用不着哈希计算
-            var iconShadows = new LinkedList<int>();
+            var iconShadows = new Dictionary<int, ShadowRichInfo>();
             // 划线暂存，含下划线、删除线等
             var drawingLineInfos = new List<RichInfo>();
             // 获取最后一个可显示出来的字符顶点，以免超出显示区域后显示错乱
             verts = ProcessRawTags(verts, resultText, textWithoutTag);
-            vertCount = verts.Count;
+            var vertCount = verts.Count;
             foreach (var richInfo in richInfos)
             {
                 CalculateRects(richInfo, verts, vertCount);
@@ -659,7 +664,8 @@ namespace SS.UIComponent
             tags.AddRange(GetTags(resultText, OutlineEndRegex, RichType.Outline, isCloseTag: true));
 
             // 阴影
-            tags.AddRange(GetTags(resultText, ShadowRegex, RichType.Shadow));
+            tags.AddRange(GetTags(resultText, ShadowRegex, RichType.Shadow,
+                paramProcessor: (str, info) => info.Content = str));
             tags.AddRange(GetTags(resultText, ShadowEndRegex, RichType.Shadow, isCloseTag: true));
 
             // 颜色
@@ -862,6 +868,19 @@ namespace SS.UIComponent
                             richInfo = gradientRichInfo;
                         }
                             break;
+                        case RichType.Shadow:
+                        {
+                            var shadowRichInfo = new ShadowRichInfo()
+                            {
+                                Type = tag.Type,
+                                StartIndex = tag.Index - offset,
+                                Color = tag.Color,
+                            };
+
+                            ProcessShadowParams(tag.Content, shadowRichInfo);
+                            richInfo = shadowRichInfo;
+                            break;
+                        }
                         default:
                             richInfo = new RichInfo()
                             {
@@ -1013,6 +1032,34 @@ namespace SS.UIComponent
             }
         }
 
+        private static void ProcessShadowParams(string content, ShadowRichInfo shadowRichInfo)
+        {
+            var direction = content.Trim();
+            switch (direction)
+            {
+                case "lt":
+                    shadowRichInfo.IsXPositive = false;
+                    shadowRichInfo.IsYPositive = true;
+                    break;
+                case "rt":
+                    shadowRichInfo.IsXPositive = true;
+                    shadowRichInfo.IsYPositive = true;
+                    break;
+                case "lb":
+                    shadowRichInfo.IsXPositive = false;
+                    shadowRichInfo.IsYPositive = false;
+                    break;
+                case "rb":
+                    shadowRichInfo.IsXPositive = true;
+                    shadowRichInfo.IsYPositive = false;
+                    break;
+                default:
+                    shadowRichInfo.IsXPositive = true;
+                    shadowRichInfo.IsYPositive = false;
+                    break;
+            }
+        }
+        
         /// <summary>
         /// 字符串转换为颜色
         /// </summary>
@@ -1046,13 +1093,19 @@ namespace SS.UIComponent
         /// <param name="verts">顶点信息</param>
         /// <param name="effectedVerts">特效渲染顶点信息</param>
         /// <param name="vertCount">顶点数</param>
-        /// <param name="iconIndexList">需要应用阴影的Icon（占位）字符的索引列表</param>
+        /// <param name="iconIndexList">需要应用阴影的Icon（占位）字符的索引与对应的阴影信息</param>
         private void ApplyShadowEffect(RichInfo richInfo, IList<UIVertex> verts, List<UIVertex> effectedVerts, int vertCount,
-            LinkedList<int> iconIndexList)
+            Dictionary<int, ShadowRichInfo> iconIndexList)
         {
             // 先检查能不能被渲染出来，不能那就算了
             if (richInfo.StartIndex * 4 >= vertCount)
             {
+                return;
+            }
+
+            if (richInfo is not ShadowRichInfo shadowRichInfo)
+            {
+                Debug.LogError("richInfo is not ShadowRichInfo");
                 return;
             }
 
@@ -1082,7 +1135,7 @@ namespace SS.UIComponent
                 // 跳过图标阴影
                 if (iconIndexes.Count != 0 && i == iconIndexes.Peek())
                 {
-                    iconIndexList.AddLast(iconIndexes.Dequeue());
+                    iconIndexList.Add(iconIndexes.Dequeue(), shadowRichInfo);
                     continue;
                 }
 
@@ -1099,8 +1152,8 @@ namespace SS.UIComponent
                     // 阴影和原字符都作为特效顶点
                     var tempVt = vt;
                     var v = vt.position;
-                    v.x += -offset;
-                    v.y += offset;
+                    v.x += offset * (shadowRichInfo.IsXPositive ? 1 : -1);
+                    v.y += offset * (shadowRichInfo.IsYPositive ? 1 : -1);
                     vt.position = v;
                     // 阴影必须比原字符透明度更低吧
                     vt.color.a = (byte)(vt.color.a / 2);
@@ -1579,7 +1632,7 @@ namespace SS.UIComponent
         #region Coroutine
 
         private IEnumerator CallIconUpdate(List<RichInfo> iconInfos, Dictionary<string, Sprite> icons,
-            List<UIVertex[]> vertices, LinkedList<int> iconShadows, Dictionary<RichInfo, UIVertex[]> gifs)
+            List<UIVertex[]> vertices, Dictionary<int, ShadowRichInfo> iconShadows, Dictionary<RichInfo, UIVertex[]> gifs)
         {
             yield return null;
             // 处理图标
