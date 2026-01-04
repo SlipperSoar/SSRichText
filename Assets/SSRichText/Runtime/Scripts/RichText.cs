@@ -180,9 +180,9 @@ namespace SS.UIComponent
         private static readonly Regex BoldEndRegex = new Regex(BoldEndRegexText);
 
         // 颜色
-        private static string ColorRegexText => @"<color=((#[0-9a-f]{8})|(#[0-9a-f]{6})|(" + GetColorWords() + @"))>";
+        private static string ColorRegexText => @"<color=((#[0-9a-f]{6,8})|(" + GetColorWords() + @"))>";
         private const string ColorEndRegexText = @"</color>";
-        private static readonly Regex ColorRegex = new Regex(ColorRegexText);
+        private static readonly Regex ColorRegex = new Regex(ColorRegexText, RegexOptions.IgnoreCase);
 
         private static readonly Regex ColorEndRegex = new Regex(ColorEndRegexText);
 
@@ -205,7 +205,7 @@ namespace SS.UIComponent
         
         // 描边
         private static readonly string OutlineRegexText =
-            @"<outline=((#[0-9a-f]{8})|(#[0-9a-f]{6})|(" + GetColorWords() + @"))>";
+            @"<outline=((#[0-9a-f]{6,8})|(" + GetColorWords() + @"))>";
 
         private const string OutlineEndRegexText = @"</outline>";
         private static readonly Regex OutlineRegex = new Regex(OutlineRegexText, RegexOptions.IgnoreCase);
@@ -219,10 +219,10 @@ namespace SS.UIComponent
 
         // 下划线
         private static readonly string UnderlineRegexText =
-            @"<underline=((#[0-9a-f]{8})|(#[0-9a-f]{6})|(" + GetColorWords() + @"))>";
+            @"<underline=((#[0-9a-f]{6,8})|(" + GetColorWords() + @"))>";
 
         private const string UnderlineEndRegexText = @"</underline>";
-        private static readonly Regex UnderlineRegex = new Regex(UnderlineRegexText);
+        private static readonly Regex UnderlineRegex = new Regex(UnderlineRegexText, RegexOptions.IgnoreCase);
         private static readonly Regex UnderlineEndRegex = new Regex(UnderlineEndRegexText);
 
         // 删除线
@@ -973,7 +973,7 @@ namespace SS.UIComponent
 
         private static string GetColorRegexGroup()
         {
-            return "(#[0-9a-f]{8})|(#[0-9a-f]{6})|(" + GetColorWords() + @")";
+            return "(#[0-9a-f]{6,8})|(" + GetColorWords() + @")";
         }
 
         /// <summary>
@@ -1016,7 +1016,11 @@ namespace SS.UIComponent
         {
             if (!Colors.TryGetValue(colorStr, out var tagColor))
             {
-                ColorUtility.TryParseHtmlString(colorStr, out tagColor);
+                if (!ColorUtility.TryParseHtmlString(colorStr, out tagColor))
+                {
+                    Debug.LogError($"cant parse str: {colorStr}");
+                    tagColor = Color.clear;
+                }
             }
 
             return tagColor;
