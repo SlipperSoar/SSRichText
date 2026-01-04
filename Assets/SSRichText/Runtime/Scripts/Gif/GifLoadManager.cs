@@ -249,7 +249,7 @@ namespace SS.UIComponent
             }
             else
             {
-                Debug.LogError($"GifPlayer not found: {gifName}");
+                Debug.LogWarning($"GifPlayer not found: {gifName}, is it already be removed?");
             }
         }
         
