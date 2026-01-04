@@ -379,6 +379,7 @@ namespace SS.UIComponent
             // Apply the offset to the vertices
             var verts = cachedTextGenerator.verts;
             var vertCount = verts.Count;
+            var effectedVerts = new List<UIVertex>();
 
             // 处理富文本效果
             // 图标的（下划线也用）
@@ -421,10 +422,10 @@ namespace SS.UIComponent
                     }
                         break;
                     case RichType.Outline:
-                        ApplyOutlineEffect(richInfo, verts, vertCount);
+                        ApplyOutlineEffect(richInfo, verts, effectedVerts, vertCount);
                         break;
                     case RichType.Shadow:
-                        ApplyShadowEffect(richInfo, verts, vertCount, iconShadows);
+                        ApplyShadowEffect(richInfo, verts, effectedVerts, vertCount, iconShadows);
                         break;
                     case RichType.Underline:
                     {
@@ -473,7 +474,7 @@ namespace SS.UIComponent
                         {
                             var vert = uVerts[i];
                             vert.uv0 = lineUVs[i];
-                            verts.Add(vert);
+                            effectedVerts.Add(vert);
                         }
                     }
                 }
@@ -497,12 +498,17 @@ namespace SS.UIComponent
             Vector2 roundingOffset = new Vector2(verts[0].position.x, verts[0].position.y) * unitsPerPixel;
             roundingOffset = PixelAdjustPoint(roundingOffset) - roundingOffset;
             toFill.Clear();
+
+            vertCount = effectedVerts.Count + verts.Count;
+            var allVertices = new List<UIVertex>(vertCount);
+            allVertices.AddRange(verts);
+            allVertices.AddRange(effectedVerts);
             if (roundingOffset != Vector2.zero)
             {
                 for (int i = 0; i < vertCount; ++i)
                 {
                     int tempVertsIndex = i & 3;
-                    m_TempVerts[tempVertsIndex] = verts[i];
+                    m_TempVerts[tempVertsIndex] = allVertices[i];
                     m_TempVerts[tempVertsIndex].position *= unitsPerPixel;
                     m_TempVerts[tempVertsIndex].position.x += roundingOffset.x;
                     m_TempVerts[tempVertsIndex].position.y += roundingOffset.y;
@@ -539,7 +545,7 @@ namespace SS.UIComponent
                 for (int i = 0; i < vertCount; ++i)
                 {
                     int tempVertsIndex = i & 3;
-                    m_TempVerts[tempVertsIndex] = verts[i];
+                    m_TempVerts[tempVertsIndex] = allVertices[i];
                     m_TempVerts[tempVertsIndex].position *= unitsPerPixel;
                     if (tempVertsIndex == 3)
                         toFill.AddUIVertexQuad(m_TempVerts);
@@ -1031,9 +1037,10 @@ namespace SS.UIComponent
         /// </summary>
         /// <param name="richInfo">富文本信息</param>
         /// <param name="verts">顶点信息</param>
+        /// <param name="effectedVerts">特效渲染顶点信息</param>
         /// <param name="vertCount">顶点数</param>
         /// <param name="iconIndexList">需要应用阴影的Icon（占位）字符的索引列表</param>
-        private void ApplyShadowEffect(RichInfo richInfo, IList<UIVertex> verts, int vertCount,
+        private void ApplyShadowEffect(RichInfo richInfo, IList<UIVertex> verts, List<UIVertex> effectedVerts, int vertCount,
             LinkedList<int> iconIndexList)
         {
             // 先检查能不能被渲染出来，不能那就算了
@@ -1053,6 +1060,9 @@ namespace SS.UIComponent
                 }
             }
 
+            // 为确保顶点三角形正确，需要将先渲染的阴影完整放入列表
+            // 再将后渲染的原字符通过此列表中转添加至特效顶点列表
+            var rawVertices = new List<UIVertex>((richInfo.EndIndex - richInfo.StartIndex) * 4);
             for (var i = richInfo.StartIndex; i < richInfo.EndIndex; i++)
             {
                 // 为了检查是否需要渲染，先算start
@@ -1079,27 +1089,27 @@ namespace SS.UIComponent
                 for (var j = start; j < end; j++)
                 {
                     vt = verts[j];
-                    verts.Add(vt);
-                    Vector3 v = vt.position;
+                    // 阴影和原字符都作为特效顶点
+                    var tempVt = vt;
+                    var v = vt.position;
                     v.x += -offset;
                     v.y += offset;
                     vt.position = v;
-                    // 先把本身透明的给改成不透明
-                    // 这是为图标准备的，但图标不在这里计算阴影了
-                    // if (vt.color.a == 0)
-                    // {
-                    //     vt.color.a = 255;
-                    // }
+                    // 阴影必须比原字符透明度更低吧
                     vt.color.a = (byte)(vt.color.a / 2);
-                    verts[j] = vt;
+                    // 先加阴影再加原字符
+                    effectedVerts.Add(vt);
+                    rawVertices.Add(tempVt);
                 }
             }
+
+            effectedVerts.AddRange(rawVertices);
         }
 
         /// <summary>
         /// 描边效果
         /// </summary>
-        private void ApplyOutlineEffect(RichInfo richInfo, IList<UIVertex> verts, int vertCount)
+        private void ApplyOutlineEffect(RichInfo richInfo, IList<UIVertex> verts, List<UIVertex> effectedVerts, int vertCount)
         {
             // 先检查能不能被渲染出来，不能那就算了
             if (richInfo.StartIndex * 4 >= vertCount)
@@ -1132,7 +1142,7 @@ namespace SS.UIComponent
                             newColor.a = (newColor.a * verts[j].color.a) / 255f;
                             vt.color = newColor;
                             vt.position = v;
-                            verts.Add(vt);
+                            effectedVerts.Add(vt);
                         }
                     }
                 }
@@ -1141,7 +1151,7 @@ namespace SS.UIComponent
             var startAt = richInfo.StartIndex * 4;
             var endAt = Mathf.Min(richInfo.EndIndex * 4, vertCount);
             for (var i = startAt; i < endAt; i++)
-                verts.Add(verts[i]);
+                effectedVerts.Add(verts[i]);
         }
 
         /// <summary>
