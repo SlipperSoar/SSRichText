@@ -160,25 +160,16 @@ namespace SS.UIComponent
         /// 获取GIF的显示尺寸
         /// </summary>
         /// <param name="gifName">gif资源名或路径</param>
-        /// <param name="useIO">是否使用IO（路径）</param>
         /// <returns></returns>
-        public Vector2Int GetGifSize(string gifName, bool useIO = false)
+        public Vector2Int GetGifSize(string gifName)
         {
             if (gifSizes.TryGetValue(gifName, out var size))
             {
                 return size;
             }
 
-            byte[] bytes = null;
-            if (useIO)
-            {
-                bytes = System.IO.File.ReadAllBytes(gifName);
-            }
-            else
-            {
-                bytes = Resources.Load<TextAsset>(gifName).bytes;
-            }
-            
+            byte[] bytes = GifProvider.GetGifBytes(gifName);
+
             size = GifDecoder.GetGifSize(bytes);
             gifSizes.TryAddToDictionary(gifName, size);
             return size;
