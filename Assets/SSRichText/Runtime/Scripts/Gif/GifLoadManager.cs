@@ -84,13 +84,29 @@ namespace SS.UIComponent
         
         #region properties
 
+        public IGifProvider GifProvider
+        {
+            get
+            {
+                if (gifProvider == null)
+                {
+                    gifProvider = new GifProvider();
+                }
+                
+                return gifProvider;
+            }
+            set => gifProvider = value;
+        }
+
+        private IGifProvider gifProvider;
+        
         private Dictionary<string, bool> gifLoadStatus = new Dictionary<string, bool>();
         private Dictionary<string, GifLoadData> gifDatas = new Dictionary<string, GifLoadData>();
         private Dictionary<string, Vector2Int> gifSizes = new Dictionary<string, Vector2Int>();
         private Dictionary<string, GifPlayer> gifPlayers = new Dictionary<string, GifPlayer>();
 
         private int loadingCount = 0;
-        private Queue<(string gifName, bool useIO, bool forceBgColorTransparent)> waitingQueue = new Queue<(string, bool, bool)>();
+        private Queue<(string gifName, bool forceBgColorTransparent)> waitingQueue = new Queue<(string, bool)>();
         private Coroutine queueChecker;
 
         #endregion
@@ -168,10 +184,10 @@ namespace SS.UIComponent
             return size;
         }
         
-        public void LoadGif(string gifName, Action<List<GifData>> onComplete, bool useIO = false, bool forceBgColorTransparent = false)
+        public void LoadGif(string gifName, Action<List<GifData>> onComplete, bool forceBgColorTransparent = false)
         {
 #if UNITY_EDITOR
-            Debug.Log($"Load Gif: {gifName}, useIO: {useIO}, forceBgColorTransparent: {forceBgColorTransparent}");
+            Debug.Log($"Load Gif: {gifName}, forceBgColorTransparent: {forceBgColorTransparent}");
 #endif
             if (gifLoadStatus.TryGetValue(gifName, out var isLoaded))
             {
@@ -199,11 +215,11 @@ namespace SS.UIComponent
                 if (loadingCount >= LOAD_MAX_COUNT)
                 {
                     // 等待
-                    waitingQueue.Enqueue((gifName, useIO, forceBgColorTransparent));
+                    waitingQueue.Enqueue((gifName, forceBgColorTransparent));
                 }
                 else
                 {
-                    LoadGif(gifName, useIO, forceBgColorTransparent);
+                    LoadGif(gifName, forceBgColorTransparent);
                 }
             }
         }
@@ -267,18 +283,10 @@ namespace SS.UIComponent
             queueChecker = StartCoroutine(CheckLoadingQueue());
         }
         
-        private void LoadGif(string gifName, bool useIO, bool forceBgColorTransparent)
+        private void LoadGif(string gifName, bool forceBgColorTransparent)
         {
             loadingCount++;
-            byte[] bytes = null;
-            if (useIO)
-            {
-                bytes = System.IO.File.ReadAllBytes(gifName);
-            }
-            else
-            {
-                bytes = Resources.Load<TextAsset>(gifName).bytes;
-            }
+            byte[] bytes = GifProvider.GetGifBytes(gifName);
                 
             StartCoroutine(GifDecoder.Decode(bytes, gifData =>
             {
@@ -298,8 +306,8 @@ namespace SS.UIComponent
                 // 检查等待队列
                 if (loadingCount < LOAD_MAX_COUNT && waitingQueue.Count > 0)
                 {
-                    var (gifName, useIO, forceBgColorTransparent) = waitingQueue.Dequeue();
-                    LoadGif(gifName, useIO, forceBgColorTransparent);
+                    var (gifName, forceBgColorTransparent) = waitingQueue.Dequeue();
+                    LoadGif(gifName, forceBgColorTransparent);
                 }
                 yield return null;
             }
