@@ -17,7 +17,6 @@ namespace SS.UIComponent
         {
             public List<GifData> Data;
             public float LastUseTime;
-            public Action<List<GifData>> OnComplete;
         }
         
         private class GifPlayer
@@ -159,8 +158,8 @@ namespace SS.UIComponent
         /// <summary>
         /// 获取GIF的显示尺寸
         /// </summary>
-        /// <param name="gifName">gif资源名或路径</param>
-        /// <returns></returns>
+        /// <param name="gifName">gif资源名</param>
+        /// <returns>gif的显示尺寸</returns>
         public Vector2Int GetGifSize(string gifName)
         {
             if (gifSizes.TryGetValue(gifName, out var size))
@@ -174,8 +173,8 @@ namespace SS.UIComponent
             gifSizes.TryAddToDictionary(gifName, size);
             return size;
         }
-        
-        public void LoadGif(string gifName, Action<List<GifData>> onComplete, bool forceBgColorTransparent = false)
+
+        public void PrepareGif(string gifName, bool forceBgColorTransparent = false)
         {
 #if UNITY_EDITOR
             Debug.Log($"Load Gif: {gifName}, forceBgColorTransparent: {forceBgColorTransparent}");
@@ -186,20 +185,11 @@ namespace SS.UIComponent
                 {
                     var loadData = gifDatas[gifName];
                     loadData.LastUseTime = Time.time;
-                    onComplete?.Invoke(loadData.Data);
-                }
-                else
-                {
-                    var loadData = gifDatas[gifName];
-                    loadData.OnComplete += onComplete;
                 }
             }
             else
             {
-                gifDatas[gifName] = new GifLoadData()
-                {
-                    OnComplete = onComplete
-                };
+                gifDatas[gifName] = new GifLoadData();
                 gifLoadStatus[gifName] = false;
                 
                 // 检查数量，超过最大同时加载数量时放入队列等待
@@ -278,14 +268,15 @@ namespace SS.UIComponent
         {
             loadingCount++;
             byte[] bytes = GifProvider.GetGifBytes(gifName);
+            // 在加载的同时就对gif的size进行计算并缓存起来
+            var gifSize = GifDecoder.GetGifSize(bytes);
+            gifSizes.TryAddToDictionary(gifName, gifSize);
                 
             StartCoroutine(GifDecoder.Decode(bytes, gifData =>
             {
                 gifLoadStatus[gifName] = true;
                 var loadData = gifDatas[gifName];
                 loadData.Data = gifData;
-                loadData.OnComplete?.Invoke(gifData);
-                loadData.OnComplete = null;
                 loadingCount--;
             }, forceBgColorTransparent: forceBgColorTransparent));
         }

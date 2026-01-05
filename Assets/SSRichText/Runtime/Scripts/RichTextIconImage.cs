@@ -45,6 +45,12 @@ namespace SS.UIComponent
             // 先把上次的停了（如果有）
             StopAllGifs();
             _gifs = gifs;
+            // 一口气加载
+            if (Application.isPlaying)
+            {
+                PrepareGifs();
+            }
+
             if (_sprites.Count == 1 && _gifs.Count == 0)
             {
                 ApplySingleSprite(icons[_sprites[0].Content].texture);
@@ -147,6 +153,14 @@ namespace SS.UIComponent
 
         #region Private Methods
 
+        private void PrepareGifs()
+        {
+            foreach (var gif in _gifs)
+            {
+                GifLoadManager.Instance.PrepareGif(gif.Key.Content);
+            }
+        }
+        
         private void ApplySingleSprite(Texture2D texture2D)
         {
             foreach (var vertex in _vertices)
@@ -254,11 +268,8 @@ namespace SS.UIComponent
                 var gifName = gif.Key.Content;
                 if (Application.isPlaying)
                 {
-                    GifLoadManager.Instance.LoadGif(gifName, frames =>
-                    {
-                        RefreshGifOffsetScale(gif.Key);
-                        GifLoadManager.Instance.AddGifPlayer(gifName, PlayGif);
-                    });
+                    RefreshGifOffsetScale(gif.Key);
+                    GifLoadManager.Instance.AddGifPlayer(gifName, PlayGif);
                 }
             }
 
@@ -472,10 +483,7 @@ namespace SS.UIComponent
             vertices[3].uv0 = new Vector4(0, 0);
             if (Application.isPlaying)
             {
-                GifLoadManager.Instance.LoadGif(richInfo.Content, frames =>
-                {
-                    GifLoadManager.Instance.AddGifPlayer(richInfo.Content, PlaySingleGif);
-                });
+                GifLoadManager.Instance.AddGifPlayer(richInfo.Content, PlaySingleGif);
             }
         }
 
