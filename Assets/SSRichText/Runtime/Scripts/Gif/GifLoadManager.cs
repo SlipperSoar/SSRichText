@@ -162,6 +162,34 @@ namespace SS.UIComponent
         #region Public Methods
 
         /// <summary>
+        /// 单独添加一个Gif的数据
+        /// 该方式可以在不解析已有gif的情况下添加GIF数据，适用于动态生成Gif效果
+        /// </summary>
+        /// <param name="gifName">gif名</param>
+        /// <param name="gifFrames">帧数据</param>
+        /// <param name="dontClear">不进行超时自动清理</param>
+        public void AddGifData(string gifName, IEnumerable<GifData> gifFrames, bool dontClear = false)
+        {
+            gifLoadStatus[gifName] = true;
+            if (gifDatas.TryGetValue(gifName, out var gifData))
+            {
+                gifData.Data.Clear();
+                gifData.Data.AddRange(gifFrames);
+                gifData.LastUseTime = Time.time;
+                gifData.DontClear = dontClear;
+            }
+            else
+            {
+                gifDatas.TryAddToDictionary(gifName, new GifLoadData()
+                {
+                    Data = new List<GifData>(gifFrames),
+                    LastUseTime = Time.time,
+                    DontClear = dontClear
+                });
+            }
+        }
+        
+        /// <summary>
         /// 获取GIF的显示尺寸
         /// </summary>
         /// <param name="gifName">gif资源名</param>
