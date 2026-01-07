@@ -166,11 +166,13 @@ namespace SS.UIComponent
         /// 该方式可以在不解析已有gif的情况下添加GIF数据，适用于动态生成Gif效果
         /// </summary>
         /// <param name="gifName">gif名</param>
+        /// <param name="size">gif尺寸</param>
         /// <param name="gifFrames">帧数据</param>
         /// <param name="dontClear">不进行超时自动清理</param>
-        public void AddGifData(string gifName, IEnumerable<GifData> gifFrames, bool dontClear = false)
+        public void AddGifData(string gifName, Vector2Int size, IEnumerable<GifData> gifFrames, bool dontClear = false)
         {
             gifLoadStatus[gifName] = true;
+            gifSizes[gifName] = size;
             if (gifDatas.TryGetValue(gifName, out var gifData))
             {
                 gifData.Data.Clear();
