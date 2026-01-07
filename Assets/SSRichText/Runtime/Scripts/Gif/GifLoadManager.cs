@@ -17,6 +17,7 @@ namespace SS.UIComponent
         {
             public List<GifData> Data;
             public float LastUseTime;
+            public bool DontClear;
         }
         
         private class GifPlayer
@@ -137,6 +138,11 @@ namespace SS.UIComponent
             // 按时间清理不再使用的GIF数据
             foreach (var gifData in gifDatas)
             {
+                if (gifData.Value.DontClear)
+                {
+                    continue;
+                }
+
                 if (gifData.Value.LastUseTime + UNLOAD_COUNT_DOWN_SECOND <= Time.time && gifLoadStatus[gifData.Key])
                 {
                     removeList.Add(gifData.Key);
@@ -174,7 +180,7 @@ namespace SS.UIComponent
             return size;
         }
 
-        public void PrepareGif(string gifName, bool forceBgColorTransparent = false)
+        public void PrepareGif(string gifName, bool dontClear = false, bool forceBgColorTransparent = false)
         {
 #if UNITY_EDITOR
             Debug.Log($"Load Gif: {gifName}, forceBgColorTransparent: {forceBgColorTransparent}");
@@ -189,7 +195,11 @@ namespace SS.UIComponent
             }
             else
             {
-                gifDatas[gifName] = new GifLoadData();
+                gifDatas[gifName] = new GifLoadData()
+                {
+                    DontClear = dontClear
+                };
+
                 gifLoadStatus[gifName] = false;
                 
                 // 检查数量，超过最大同时加载数量时放入队列等待
