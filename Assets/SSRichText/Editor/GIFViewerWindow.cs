@@ -1,4 +1,5 @@
-﻿using System.Collections;
+﻿#if UNITY_EDITOR
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using SS.UIComponent;
@@ -33,12 +34,13 @@ namespace SS.Editor
         {
             lastFrameTime = EditorApplication.timeSinceStartup;
         }
-        
+
         private void OnGUI()
         {
             GUILayout.Label("GIF Viewer (Texture > TextAsset)", EditorStyles.boldLabel);
 
-            gifFileTexture2D = (Texture2D)EditorGUILayout.ObjectField("Select GIF File", gifFileTexture2D, typeof(Texture2D), false);
+            gifFileTexture2D =
+                (Texture2D)EditorGUILayout.ObjectField("Select GIF File", gifFileTexture2D, typeof(Texture2D), false);
             gifBytesAsset =
                 (TextAsset)EditorGUILayout.ObjectField("Select GIF Bytes File", gifBytesAsset, typeof(TextAsset),
                     false);
@@ -91,9 +93,9 @@ namespace SS.Editor
             {
                 return;
             }
-            
+
             var currentTime = EditorApplication.timeSinceStartup;
-            
+
             Rect previewRect = GUILayoutUtility.GetRect(previewSize, previewSize);
             var currentFrame = gifFrames[currentPreviewIndex];
             var nextFrameIndex = (currentPreviewIndex + 1) % gifFrames.Count;
@@ -129,10 +131,11 @@ namespace SS.Editor
                 {
                     GUILayout.EndHorizontal();
                 }
-                
+
                 currentHorizontalCount++;
                 currentHorizontalCount %= maxHorizontalCount;
             }
+
             GUILayout.EndScrollView();
         }
 
@@ -143,14 +146,14 @@ namespace SS.Editor
         {
             if (gifDecoder != null && gifDecoder.MoveNext())
             {
-                Repaint();  // Refresh the window if necessary (e.g., for progress updates).
+                Repaint(); // Refresh the window if necessary (e.g., for progress updates).
             }
             else
             {
-                EditorApplication.update -= OnEditorUpdate;  // Stop updating when the coroutine finishes
+                EditorApplication.update -= OnEditorUpdate; // Stop updating when the coroutine finishes
             }
         }
-        
+
         private void LoadGifFile(string gifPath, bool isBytesAsset = false)
         {
             var bytes = isBytesAsset ? gifBytesAsset.bytes : File.ReadAllBytes(gifPath);
@@ -165,3 +168,4 @@ namespace SS.Editor
         }
     }
 }
+#endif
