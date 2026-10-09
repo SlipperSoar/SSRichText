@@ -32,6 +32,19 @@ Unity版本：Unity2020或以上经过测试可用，Unity2019及以下或Unity6
 |                    \<gif=xxxx/>                     | 动图  |        需要配合GifDecoder和LoadManager使用         |
 | \<gradient lt=red rt=red lb=red rb=red>\</gradient> | 渐变  |               需要填写四个顶点（四角）的颜色               |
 
+支持的颜色单词：
+
+- white（白色）
+- black（黑色）
+- red（红色）
+- green（绿色）
+- blue（蓝色）
+- yellow（黄色）
+- cyan（青色）
+- magenta（品红色）
+- gray（灰色）
+- grey（灰色）
+
 支持富文本点击事件：
 
 |         标签          |  事件消息   |       参数       |                       备注                        |
