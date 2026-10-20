@@ -64,6 +64,9 @@ sysinfo.txt
 *.unitypackage
 *.app
 
+# Release packaging output (Tools~/BuildUnityPackage.ps1)
+/dist/
+
 # Crashlytics generated file
 crashlytics-build.properties
 

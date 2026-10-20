@@ -43,7 +43,7 @@ https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText
 需要固定版本时在末尾追加 tag，例如：
 
 ```text
-https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText#v2.0.0
+https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText#v2.1.0
 ```
 
 也可以直接写进 `Packages/manifest.json`：
@@ -51,7 +51,7 @@ https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText#v2.0.0
 ```json
 {
   "dependencies": {
-    "com.github-slippersoar.ssrichtext": "https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText#v2.0.0"
+    "com.github-slippersoar.ssrichtext": "https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText#v2.1.0"
   }
 }
 ```
@@ -259,6 +259,7 @@ Assets/Resources/                  # 示例用的图标与 GIF 数据
 ## 更新日志与路线图
 
 - 版本变更见 [CHANGELOG.md](CHANGELOG.md)
+- 维护者发布流程见 [RELEASING.md](RELEASING.md)
 - 已实现：描边、阴影、下划线、删除线、渐变、链接、图标、GIF、点击事件
 - 尚未实现：把 `<gif>` 内的文本渲染到动图帧上（扩展块不参与画面渲染）
 
@@ -280,6 +281,6 @@ Assets/Resources/                  # 示例用的图标与 GIF 数据
 **SSRichText** is a rich text component for Unity's legacy UGUI `Text`. It keeps the built-in `<b>`, `<i>`, `<size>` and `<color>` tags and adds `<outline>`, `<shadow>`, `<underline>`, `<s>`, `<gradient>`, `<link>`, `<icon>` and `<gif>`, plus a single `OnClick` event for every tag.
 
 - Requires Unity 2021.2+ and UGUI Legacy `Text` (not TextMeshPro).
-- Install via UPM: `https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText` (append `#v2.0.0` to pin a version), or download the `.unitypackage` from [Releases](https://github.com/SlipperSoar/SSRichText/releases/latest).
+- Install via UPM: `https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText` (append `#v2.1.0` to pin a version), or download the `.unitypackage` from [Releases](https://github.com/SlipperSoar/SSRichText/releases/latest).
 - Icons and GIFs are resolved through `IIconProvider` / `IGifProvider`, both defaulting to `Resources`.
 - Licensed under the [MIT License](LICENSE). Full documentation (Chinese) is above.

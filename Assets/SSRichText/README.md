@@ -20,7 +20,7 @@
 https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText
 ```
 
-需要固定版本时追加 tag，例如 `#v2.0.0`。
+需要固定版本时追加 tag，例如 `#v2.1.0`。
 
 ## 使用
 
