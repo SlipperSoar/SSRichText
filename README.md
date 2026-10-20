@@ -72,7 +72,7 @@ https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText#v2.0.0
 ```text
 <color=#ff8844>公告</color><b>服务器</b><i>维护</i>通知
 <outline=#000000>描边</outline> <underline=#00ff00>下划线</underline> <s>删除线</s>
-<shadow=rb>右下阴影</shadow> <link=https://unity.com>打开官网</link>
+<shadow=rb>右下阴影</shadow> <link=https://unity.com>打开官网</link> <link=www.unity.com>无协议链接</link>
 <gradient lt=#ff0000 rt=#ffff00 lb=#00ff00 rb=#0000ff>四角渐变</gradient>
 <icon=heart/> <gif=cat/>
 ```
@@ -125,7 +125,7 @@ public class RichTextExample : MonoBehaviour
 | 阴影 | `<shadow=lt>text</shadow>` | 方向：`lt` 左上、`rt` 右上、`lb` 左下、`rb` 右下 |
 | 下划线 | `<underline=red>text</underline>` | 必须带颜色参数 |
 | 渐变 | `<gradient lt=red rt=red lb=red rb=red>text</gradient>` | 需要给出四个角的颜色，可分别使用颜色名或十六进制 |
-| 链接 | `<link=https://unity.com>text</link>` | 必须是带协议头的完整地址 |
+| 链接 | `<link=www.unity.com>text</link>` | 支持 `https://` 等协议，也可省略协议头（自动补 `https://`） |
 | 图标 | `<icon=heart/>` | 默认从 `Resources` 读取 `Sprite`，可通过 `IIconProvider` 替换 |
 | 动图 | `<gif=cat/>` | 默认从 `Resources` 读取 `.bytes`，由 `GifLoadManager` 自动解码播放 |
 
@@ -150,7 +150,7 @@ public event Action<RichText.RichType, string> OnClick;
 
 | 标签 | 回调参数 `type` | 回调参数 `message` |
 | --- | --- | --- |
-| `<link=url>` | `RichType.Link` | 标签中的 url |
+| `<link=url>` | `RichType.Link` | 标签中的 url；不带协议头时会补全成 `https://...` |
 | `<icon=name/>` | `RichType.Icon` | 图标名 |
 | `<gif=name/>` | `RichType.Gif` | 动图名 |
 | 其它标签 | 对应的 `RichType` | 标签包裹的文本内容 |
@@ -158,7 +158,8 @@ public event Action<RichText.RichType, string> OnClick;
 补充说明：
 
 - 同一位置有多个标签重叠时，按 `RichType` 枚举顺序取优先级最高的一个：删除线 > 动图 > 图标 > 链接 > 下划线 > 阴影 > 描边 > 渐变 > 字号 > 颜色 > 粗体 > 斜体。
-- `<link>` 只识别带协议头的地址（如 `http://`、`https://`、`file://`），`<link=www.unity.com>` 不会被解析，而是原样显示为文本。
+- `<link>` 既支持带协议头的地址（`http://`、`https://`、`file://`、`mailto:`、`tel:` 以及自定义 scheme），也支持省略协议头的写法（`www.unity.com`、`unity.com/docs`、`localhost:8080`、`127.0.0.1:8080`）。省略协议头时，回调里收到的是补全后的 `https://...` 地址，可以直接交给 `Application.OpenURL`。
+- `<link=hello>` 这类既没有协议头、也不像域名的内容不会被识别为链接，会原样显示为文本。
 - 文本外层必须开启 `Raycast Target`，并且 Canvas 上有 `GraphicRaycaster`，才能收到点击。
 
 ## 图标
@@ -231,7 +232,7 @@ GifLoadManager.Instance.AddGifData(
 
 | 入口 | 作用 |
 | --- | --- |
-| `Window > GIF Viewer` | 预览 `.gif` 或 `.bytes` 的解码结果、帧数与尺寸 |
+| `Window > SS > GIF Viewer` | 预览 `.gif` 或 `.bytes` 的解码结果、帧数与尺寸 |
 | 导入 `.gif` | 自动转换成 `.bytes`，方便 `Resources` 加载 |
 
 ## 已知限制
@@ -249,7 +250,7 @@ GifLoadManager.Instance.AddGifData(
 Assets/SSRichText/                 # 可独立分发的 UPM 包
   Runtime/Scripts/                 # RichText、IconProvider、GIF 解码与加载
   Runtime/Shaders/                 # 图标/动图合并贴图用的 Shader
-  Editor/                          # GIF Viewer 与导入处理
+  Editor/                          # GIF Viewer 与导入处理（独立 Editor 程序集）
 Assets/Scenes/SampleScene.unity    # 示例场景
 Assets/Scripts/Sample/             # 示例脚本
 Assets/Resources/                  # 示例用的图标与 GIF 数据

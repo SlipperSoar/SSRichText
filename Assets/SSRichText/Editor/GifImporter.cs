@@ -1,16 +1,24 @@
-﻿#if UNITY_EDITOR
+using System;
 using System.IO;
 using UnityEditor;
 using UnityEngine;
 
 namespace SS.Editor
 {
+    /// <summary>
+    /// 导入 .gif 时自动转换成同名的 .bytes，方便通过 Resources / TextAsset 读取。
+    /// 转换完成后会删除原始 .gif 资源。
+    /// </summary>
     public class GifImporter : AssetPostprocessor
     {
+        internal const string GifExtension = ".gif";
+        internal const string BytesExtension = ".bytes";
+        private const string LogPrefix = "[SSRichText]";
+
         private void OnPostprocessTexture(Texture2D texture)
         {
             // 只处理 GIF 文件
-            if (!Path.GetExtension(assetPath).ToLower().Equals(".gif"))
+            if (!string.Equals(Path.GetExtension(assetPath), GifExtension, StringComparison.OrdinalIgnoreCase))
             {
                 return;
             }
@@ -18,44 +26,45 @@ namespace SS.Editor
             ConvertGifToTextAsset(assetPath);
         }
 
-        // 将 GIF 文件转换为 TextAsset
-        static void ConvertGifToTextAsset(string gifFilePath)
+        /// <summary>
+        /// 把 GIF 的字节数据写成同名 .bytes，并沿用 GIF 的缩略图作为图标
+        /// </summary>
+        private static void ConvertGifToTextAsset(string gifFilePath)
         {
-            var bytesPath = Path.ChangeExtension(gifFilePath, ".bytes");
+            if (!File.Exists(gifFilePath))
+            {
+                Debug.LogWarning($"{LogPrefix} GIF file not found: {gifFilePath}");
+                return;
+            }
 
-            // 读取 GIF 文件的字节数据
-            byte[] gifBytes = File.ReadAllBytes(gifFilePath);
+            var bytesPath = Path.ChangeExtension(gifFilePath, BytesExtension);
 
-            // 将字节数据写入文件
-            File.WriteAllBytes(bytesPath, gifBytes);
-
-            // 刷新 AssetDatabase，以便 Unity 能识别并显示这个新创建的文件
-            AssetDatabase.ImportAsset(bytesPath);
+            // 读取 GIF 文件的字节数据并写成 TextAsset
+            File.WriteAllBytes(bytesPath, File.ReadAllBytes(gifFilePath));
+            AssetDatabase.ImportAsset(bytesPath, ImportAssetOptions.ForceUpdate);
 
             // 为新的 .bytes 文件设置自定义图标
-            SetCustomIconForGifAsset(bytesPath, gifFilePath);
+            SetIconForBytesAsset(bytesPath, gifFilePath);
 
-            // 删除原始 GIF 文件的导入资源
+            // 转换完成后原始 GIF 不再需要，删除以免同一份数据在工程里出现两次
             AssetDatabase.DeleteAsset(gifFilePath);
         }
 
-        // 为 TextAsset 设置图标
-        static void SetCustomIconForGifAsset(string bytesAssetPath, string gifFilePath)
+        /// <summary>
+        /// 把 GIF 的缩略图设置为对应 .bytes 文件的图标
+        /// </summary>
+        private static void SetIconForBytesAsset(string bytesAssetPath, string gifFilePath)
         {
-            // 获取与 GIF 文件相关的纹理（可以是 GIF 文件本身的缩略图，或者指定的图像）
-            Texture2D gifThumbnail = AssetDatabase.LoadAssetAtPath<Texture2D>(gifFilePath);
+            var gifThumbnail = AssetDatabase.LoadAssetAtPath<Texture2D>(gifFilePath);
+            var bytesAsset = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(bytesAssetPath);
 
-            if (gifThumbnail != null)
+            if (gifThumbnail == null || bytesAsset == null)
             {
-                // 为新生成的 .bytes 文件设置图标
-                EditorGUIUtility.SetIconForObject(AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(bytesAssetPath),
-                    gifThumbnail);
+                Debug.LogWarning($"{LogPrefix} GIF thumbnail not found, using default icon: {gifFilePath}");
+                return;
             }
-            else
-            {
-                Debug.LogWarning("GIF thumbnail not found, using default icon.");
-            }
+
+            EditorGUIUtility.SetIconForObject(bytesAsset, gifThumbnail);
         }
     }
 }
-#endif

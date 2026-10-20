@@ -10,7 +10,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
+#if UNITY_EDITOR
 using UnityEditor;
+#endif
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -238,11 +240,27 @@ namespace SS.UIComponent
         private static readonly Regex StrikeLineEndRegex = new Regex(StrikeLineEndRegexText);
 
         // link
-        // private static readonly string LinkRegexText = @"<link=([a-zA-z]+://[^\s]*?)>";
-        private static readonly string LinkRegexText = @"<link=([a-zA-Z][a-zA-Z0-9+\-.]*://[^\s>]+)>";
+        // 支持两种写法：
+        // 1. 带协议头：https://...、file://...、mailto:... 以及自定义 scheme
+        // 2. 不带协议头：www.example.com、example.com/path?q=1、localhost:8080、127.0.0.1:8080
+        private static readonly string LinkRegexText =
+            @"<link=([a-zA-Z][a-zA-Z0-9+\-.]*:[^\s>]+" +
+            @"|(?:(?:(?:[a-zA-Z0-9](?:[a-zA-Z0-9\-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{2,})|localhost|(?:\d{1,3}(?:\.\d{1,3}){3}))" +
+            @"(?::\d{1,5})?(?:[/?#][^\s>]*)?)>";
         private const string LinkEndRegexText = @"</link>";
         private static readonly Regex LinkRegex = new Regex(LinkRegexText);
         private static readonly Regex LinkEndRegex = new Regex(LinkEndRegexText);
+
+        // 给不带协议头的 link 补全协议时用
+        private static readonly Regex AbsoluteUrlRegex = new Regex(@"^[a-zA-Z][a-zA-Z0-9+\-.]*://");
+
+        private static readonly Regex NonHierarchicalSchemeRegex =
+            new Regex(@"^(mailto|tel|sms|geo|file|data|urn|magnet):", RegexOptions.IgnoreCase);
+
+        private static readonly Regex BareHostRegex =
+            new Regex(
+                @"^(?:(?:(?:[a-zA-Z0-9](?:[a-zA-Z0-9\-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{2,})|localhost|(?:\d{1,3}(?:\.\d{1,3}){3}))" +
+                @"(?::\d{1,5})?(?:[/?#].*)?$", RegexOptions.IgnoreCase);
 
         // 图标
         private static readonly Regex IconRegex = new Regex(@"<icon=([a-zA-Z0-9_\-\(\)\.]+)/>");
@@ -611,6 +629,9 @@ namespace SS.UIComponent
                 switch (target.Type)
                 {
                     case RichType.Link:
+                        // 不带协议头的地址补上 https://，方便直接交给 Application.OpenURL
+                        message = NormalizeUrl(target.Content);
+                        break;
                     case RichType.Icon:
                     case RichType.Gif:
                         message = target.Content;
@@ -1084,6 +1105,28 @@ namespace SS.UIComponent
             }
 
             return tagColor;
+        }
+
+        /// <summary>
+        /// 补全 link 的协议头：已带协议头的地址原样返回，裸域名 / 本地地址补上 https://
+        /// </summary>
+        /// <param name="url">标签中填写的地址</param>
+        /// <returns>可以直接打开或访问的绝对地址</returns>
+        private static string NormalizeUrl(string url)
+        {
+            if (string.IsNullOrEmpty(url))
+            {
+                return url;
+            }
+
+            // http://、https://、file:// 等带 :// 的协议，以及 mailto:、tel: 等不需要 // 的协议
+            if (AbsoluteUrlRegex.IsMatch(url) || NonHierarchicalSchemeRegex.IsMatch(url))
+            {
+                return url;
+            }
+
+            // www.example.com、example.com/path?q=1、localhost:8080 等不带协议头的地址
+            return BareHostRegex.IsMatch(url) ? $"https://{url}" : url;
         }
         
         /// <summary>

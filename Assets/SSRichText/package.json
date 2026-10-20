@@ -1,7 +1,7 @@
 {
     "name": "com.github-slippersoar.ssrichtext",
     "displayName": "SSRichText",
-    "version": "2.0.0",
+    "version": "2.1.0",
     "description": "Rich text for Unity legacy UGUI Text: outline, shadow, underline, strikethrough, gradient, link, inline icon and GIF support with a unified click event.",
     "unity": "2021.2",
     "keywords": [

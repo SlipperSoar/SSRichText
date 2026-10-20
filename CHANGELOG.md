@@ -4,6 +4,23 @@
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-10-20
+
+### Added
+
+- `<link>` 支持省略协议头的地址（`www.example.com`、`example.com/path`、`localhost:8080`、`127.0.0.1:8080`），点击回调时会自动补全为 `https://...`；同时支持 `mailto:`、`tel:` 等非层级协议。
+
+### Changed
+
+- Editor 代码改为独立程序集 `SS.UIComponent.Editor`（`includePlatforms: Editor`），不再用整文件 `#if UNITY_EDITOR` 包裹，也不会被编进运行时程序集。
+- GIF 预览窗口菜单从 `Window > GIF Viewer` 调整为 `Window > SS > GIF Viewer`。
+- `.idea/` 目录不再纳入版本管理。
+
+### Fixed
+
+- GIF 预览窗口重新打开后可能空引用、重复注册 `EditorApplication.update` 回调、"Stop Load" 后同一文件无法再次加载的问题。
+- 运行时程序集里的 `using UnityEditor;` 改为仅在编辑器下生效。
+
 ## [2.0.0] - 2026-01-22
 
 ### Fixed
@@ -78,7 +95,8 @@
 
 - 首个版本：基于 Unity 原生 UI Text 的富文本组件。
 
-[Unreleased]: https://github.com/SlipperSoar/SSRichText/compare/v2.0.0...HEAD
+[Unreleased]: https://github.com/SlipperSoar/SSRichText/compare/v2.1.0...HEAD
+[2.1.0]: https://github.com/SlipperSoar/SSRichText/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/SlipperSoar/SSRichText/compare/v1.9.0...v2.0.0
 [1.9.0]: https://github.com/SlipperSoar/SSRichText/compare/v1.8.0...v1.9.0
 [1.8.0]: https://github.com/SlipperSoar/SSRichText/compare/v1.7.0...v1.8.0

@@ -62,7 +62,7 @@ public class RichTextExample : MonoBehaviour
 | 阴影 | `<shadow=rb>text</shadow>` | `lt` / `rt` / `lb` / `rb` 四个方向 |
 | 下划线 | `<underline=red>text</underline>` | 必须带颜色参数 |
 | 渐变 | `<gradient lt=red rt=red lb=red rb=red>text</gradient>` | 四个角的颜色 |
-| 链接 | `<link=https://unity.com>text</link>` | 需带协议头 |
+| 链接 | `<link=www.unity.com>text</link>` | 支持省略协议头，回调时自动补 `https://` |
 | 图标 | `<icon=heart/>` | 默认从 `Resources` 读取 `Sprite` |
 | 动图 | `<gif=cat/>` | 默认从 `Resources` 读取 `.bytes` |
 
@@ -72,7 +72,7 @@ public class RichTextExample : MonoBehaviour
 public event Action<RichText.RichType, string> OnClick;
 ```
 
-`<link>`、`<icon>`、`<gif>` 返回标签中的地址或名称，其它标签返回被包裹的文本。标签重叠时按 `RichType` 枚举顺序触发优先级最高者。
+`<link>` 返回标签中的地址（不带协议头时会补全成 `https://...`），`<icon>`、`<gif>` 返回图标或动图名称，其它标签返回被包裹的文本。标签重叠时按 `RichType` 枚举顺序触发优先级最高者。
 
 ## 图标与动图
 
