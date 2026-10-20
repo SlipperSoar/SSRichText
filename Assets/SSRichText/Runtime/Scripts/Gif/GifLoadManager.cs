@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -108,6 +108,7 @@ namespace SS.UIComponent
         private int loadingCount = 0;
         private Queue<(string gifName, bool forceBgColorTransparent)> waitingQueue = new Queue<(string, bool)>();
         private Coroutine queueChecker;
+        private readonly List<string> removeList = new List<string>();
 
         #endregion
 
@@ -134,7 +135,7 @@ namespace SS.UIComponent
                 }
             }
             
-            var removeList = new List<string>(gifDatas.Count);
+            removeList.Clear();
             // 按时间清理不再使用的GIF数据
             foreach (var gifData in gifDatas)
             {
@@ -151,9 +152,32 @@ namespace SS.UIComponent
 
             foreach (var gifName in removeList)
             {
+                if (gifDatas.TryGetValue(gifName, out var gifData))
+                {
+                    ReleaseGifData(gifData);
+                }
+
                 gifLoadStatus.Remove(gifName);
                 gifDatas.Remove(gifName);
                 gifSizes.Remove(gifName);
+            }
+        }
+
+        private void OnDestroy()
+        {
+            foreach (var gifData in gifDatas.Values)
+            {
+                ReleaseGifData(gifData);
+            }
+
+            gifDatas.Clear();
+            gifLoadStatus.Clear();
+            gifSizes.Clear();
+            gifPlayers.Clear();
+
+            if (_instance == this)
+            {
+                _instance = null;
             }
         }
 
@@ -163,7 +187,8 @@ namespace SS.UIComponent
 
         /// <summary>
         /// 单独添加一个Gif的数据
-        /// 该方式可以在不解析已有gif的情况下添加GIF数据，适用于动态生成Gif效果
+        /// 该方式可以在不解析已有gif的情况下添加GIF数据，适用于动态生成Gif效果。
+        /// 管理器会接管这些帧的纹理，卸载/替换时会销毁它们。
         /// </summary>
         /// <param name="gifName">gif名</param>
         /// <param name="size">gif尺寸</param>
@@ -175,8 +200,11 @@ namespace SS.UIComponent
             gifSizes[gifName] = size;
             if (gifDatas.TryGetValue(gifName, out var gifData))
             {
-                gifData.Data.Clear();
-                gifData.Data.AddRange(gifFrames);
+                // 先复制一份，兼容 gifFrames 就是 gifData.Data 自身的情况；
+                // 旧帧由管理器持有，替换前先销毁纹理
+                var frames = new List<GifData>(gifFrames);
+                ReleaseGifData(gifData);
+                gifData.Data.AddRange(frames);
                 gifData.LastUseTime = Time.time;
                 gifData.DontClear = dontClear;
             }
@@ -293,6 +321,24 @@ namespace SS.UIComponent
         #endregion
 
         #region Private Methods
+
+        /// <summary>
+        /// 销毁一组 GIF 帧纹理并清空列表
+        /// </summary>
+        private static void ReleaseGifData(GifLoadData data)
+        {
+            if (data?.Data == null)
+            {
+                return;
+            }
+
+            foreach (var frame in data.Data)
+            {
+                frame?.Release();
+            }
+
+            data.Data.Clear();
+        }
 
         private void InitQueueCheck()
         {

@@ -4,6 +4,20 @@
 
 ## [Unreleased]
 
+## [2.3.1] - 2026-10-20
+
+### Fixed
+
+- 修复 `RichTextIconImage` 每次重建都申请新的合并 `RenderTexture` 却从不释放的问题。
+- 修复 GIF 缓存淘汰、`AddGifData` 替换、GIF Viewer 停止/关闭时帧纹理没有销毁的问题；解码中途取消也会释放已解码帧。
+- 修复 GIF Viewer 加载完成后的预览不会自动播放的问题，现在按约 30fps 自动重绘。
+- 移除 `RichTextIconImage` 的调试/逐帧日志，避免编辑器 Console 刷屏。
+
+### Changed
+
+- `GifLoadManager.Update` 复用清理列表，避免每帧产生新的 `List` 分配。
+- `GifDecoder.Decode` 新增接收帧列表的重载，便于调用方管理帧的生命周期。
+
 ## [2.3.0] - 2026-10-20
 
 ### Changed
@@ -120,7 +134,8 @@
 
 - 首个版本：基于 Unity 原生 UI Text 的富文本组件。
 
-[Unreleased]: https://github.com/SlipperSoar/SSRichText/compare/v2.3.0...HEAD
+[Unreleased]: https://github.com/SlipperSoar/SSRichText/compare/v2.3.1...HEAD
+[2.3.1]: https://github.com/SlipperSoar/SSRichText/compare/v2.3.0...v2.3.1
 [2.3.0]: https://github.com/SlipperSoar/SSRichText/compare/v2.2.0...v2.3.0
 [2.2.0]: https://github.com/SlipperSoar/SSRichText/compare/v2.1.0...v2.2.0
 [2.1.0]: https://github.com/SlipperSoar/SSRichText/compare/v2.0.0...v2.1.0

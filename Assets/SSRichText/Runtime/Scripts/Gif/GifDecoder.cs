@@ -26,6 +26,28 @@ namespace SS.UIComponent
             DelaySecond = delaySecond;
             FrameTexture = frameTexture;
         }
+
+        /// <summary>
+        /// 释放帧纹理。Texture2D 是原生对象，不会被 GC 回收，必须显式销毁。
+        /// </summary>
+        public void Release()
+        {
+            if (FrameTexture == null)
+            {
+                return;
+            }
+
+            if (Application.isPlaying)
+            {
+                UnityEngine.Object.Destroy(FrameTexture);
+            }
+            else
+            {
+                UnityEngine.Object.DestroyImmediate(FrameTexture);
+            }
+
+            FrameTexture = null;
+        }
     }
     
     public interface IGifExtensionBlock
@@ -277,7 +299,25 @@ namespace SS.UIComponent
         /// <returns>迭代器，可用于协程，避免主线程阻塞</returns>
         public static IEnumerator Decode(byte[] bytes, Action<List<GifData>> onComplete, bool forceBgColorTransparent = false)
         {
-            var frames = new List<GifData>();
+            return Decode(bytes, new List<GifData>(), onComplete, forceBgColorTransparent);
+        }
+
+        /// <summary>
+        /// 解码 GIF 到指定列表，便于中途取消时由调用方释放已经解码出来的帧纹理
+        /// </summary>
+        /// <param name="bytes">Gif文件的字节数据</param>
+        /// <param name="frames">接收帧数据的列表</param>
+        /// <param name="onComplete">解码完成的回调，参数为帧数据</param>
+        /// <param name="forceBgColorTransparent">强制背景色透明</param>
+        /// <returns>迭代器，可用于协程，避免主线程阻塞</returns>
+        public static IEnumerator Decode(byte[] bytes, List<GifData> frames, Action<List<GifData>> onComplete,
+            bool forceBgColorTransparent = false)
+        {
+            if (frames == null)
+            {
+                frames = new List<GifData>();
+            }
+
             var byteIndex = 0;
             // Header
             var sb = new StringBuilder();

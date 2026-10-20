@@ -15,10 +15,12 @@ namespace SS.Editor
         private const float PreviewSize = 128f;
         private const int MaxHorizontalCount = 4;
         private const string WindowTitle = "GIF Viewer";
-        private const string LogPrefix = "[SSRichText]";
 
         /// <summary>每次 Editor 更新最多用于推进解码的时间（秒），避免长时间阻塞编辑器</summary>
         private const double LoadTimeBudgetSeconds = 0.01;
+
+        /// <summary>加载完成后的预览重绘间隔（秒），约 30fps</summary>
+        private const double PreviewRepaintInterval = 1.0 / 30.0;
 
         private List<GifData> gifFrames;
         private string gifFilePath;
@@ -27,6 +29,7 @@ namespace SS.Editor
         private Vector2 scrollPosition;
         private int currentPreviewIndex;
         private double lastFrameTime;
+        private double nextPreviewRepaintTime;
         private bool isLoading;
 
         private IEnumerator gifDecoder;
@@ -45,11 +48,21 @@ namespace SS.Editor
             }
 
             lastFrameTime = EditorApplication.timeSinceStartup;
+            nextPreviewRepaintTime = lastFrameTime;
         }
 
         private void OnDisable()
         {
+            StopPreview();
             StopLoading();
+            DestroyFrames();
+            gifFilePath = null;
+        }
+
+        private void OnDestroy()
+        {
+            StopPreview();
+            DestroyFrames();
         }
 
         private void OnGUI()
@@ -206,8 +219,16 @@ namespace SS.Editor
 
             var bytes = isBytesAsset ? gifBytesAsset.bytes : File.ReadAllBytes(gifPath);
 
+            if (gifFrames == null)
+            {
+                gifFrames = new List<GifData>();
+            }
+
+            // 载入新文件前，先停掉旧预览并销毁旧帧纹理
+            StopPreview();
+            DestroyFrames();
+
             gifFilePath = gifPath;
-            gifFrames = new List<GifData>();
             currentPreviewIndex = 0;
             scrollPosition = Vector2.zero;
             isLoading = true;
@@ -216,20 +237,69 @@ namespace SS.Editor
             EditorApplication.update -= OnEditorUpdate;
             EditorApplication.update += OnEditorUpdate;
 
-            gifDecoder = GifDecoder.Decode(bytes, frames =>
+            // 传自己的列表进去，中途 Stop/关闭窗口时可以按帧释放已经解出来的纹理
+            gifDecoder = GifDecoder.Decode(bytes, gifFrames, frames =>
             {
-                gifFrames = frames;
                 currentPreviewIndex = 0;
                 lastFrameTime = EditorApplication.timeSinceStartup;
                 isLoading = false;
                 Repaint();
-
-                Debug.Log($"{LogPrefix} Load GIF {gifFilePath} done, {frames.Count} frame(s)");
+                StartPreview();
             });
+        }
+
+        private void StartPreview()
+        {
+            nextPreviewRepaintTime = EditorApplication.timeSinceStartup;
+            EditorApplication.update -= OnPreviewUpdate;
+            EditorApplication.update += OnPreviewUpdate;
+        }
+
+        private void StopPreview()
+        {
+            EditorApplication.update -= OnPreviewUpdate;
+        }
+
+        /// <summary>
+        /// 预览播放：按固定间隔重绘窗口，避免鼠标不动时画面停在某一帧
+        /// </summary>
+        private void OnPreviewUpdate()
+        {
+            if (isLoading || gifFrames == null || gifFrames.Count == 0)
+            {
+                return;
+            }
+
+            var now = EditorApplication.timeSinceStartup;
+            if (now < nextPreviewRepaintTime)
+            {
+                return;
+            }
+
+            nextPreviewRepaintTime = now + PreviewRepaintInterval;
+            Repaint();
+        }
+
+        private void DestroyFrames()
+        {
+            if (gifFrames == null)
+            {
+                return;
+            }
+
+            foreach (var frame in gifFrames)
+            {
+                frame?.Release();
+            }
+
+            gifFrames.Clear();
+            currentPreviewIndex = 0;
         }
 
         private void StopLoading()
         {
+            StopPreview();
+
             if (!isLoading)
             {
                 return;
@@ -240,6 +310,8 @@ namespace SS.Editor
             // 清空路径，保证同一文件可以重新加载
             gifFilePath = null;
             EditorApplication.update -= OnEditorUpdate;
+            // 已经解码出来的帧由 gifFrames 持有，这里一并释放
+            DestroyFrames();
         }
     }
 }

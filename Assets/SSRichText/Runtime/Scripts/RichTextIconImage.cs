@@ -44,6 +44,8 @@ namespace SS.UIComponent
             _iconShadows = iconShadows;
             // 先把上次的停了（如果有）
             StopAllGifs();
+            // 旧的合并纹理已经不再使用，先释放，避免每次重建都多占一张 RenderTexture
+            ReleaseRenderTexture();
             _gifs = gifs;
             // 一口气加载
             if (Application.isPlaying)
@@ -73,11 +75,13 @@ namespace SS.UIComponent
 
         public void Clear()
         {
+            StopAllGifs();
+            ReleaseRenderTexture();
+            texture = null;
             _vertices = null;
             _sprites = null;
             _gifs = null;
             _iconShadows = null;
-            StopAllGifs();
             SetAllDirty();
         }
         
@@ -145,13 +149,52 @@ namespace SS.UIComponent
         protected override void OnDestroy()
         {
             base.OnDestroy();
-            
+
             StopAllGifs();
+            ReleaseRenderTexture();
+            DestroyNativeObject(blitMaterial);
+            blitMaterial = null;
         }
 
         #endregion
 
         #region Private Methods
+
+        /// <summary>
+        /// 释放合并图标/动图时申请的临时 RenderTexture
+        /// </summary>
+        private void ReleaseRenderTexture()
+        {
+            if (rt == null)
+            {
+                return;
+            }
+
+            if (texture == rt)
+            {
+                texture = null;
+            }
+
+            RenderTexture.ReleaseTemporary(rt);
+            rt = null;
+        }
+
+        private static void DestroyNativeObject(Object obj)
+        {
+            if (obj == null)
+            {
+                return;
+            }
+
+            if (Application.isPlaying)
+            {
+                Object.Destroy(obj);
+            }
+            else
+            {
+                Object.DestroyImmediate(obj);
+            }
+        }
 
         private void PrepareGifs()
         {
@@ -183,9 +226,6 @@ namespace SS.UIComponent
 
             (textureWidth, textureHeight) =
                 CalcOffsetForCombine(icons, out var iconOffsetSizes, out var gifOffsetSizes);
-#if UNITY_EDITOR
-            Debug.Log($"Texture Size: {textureWidth}x{textureHeight}");
-#endif
             var totalWidth = (float)textureWidth;
             var totalHeight = (float)textureHeight;
             // TODO: 当图超过支持的最大大小时，会创建一个支持的最大大小，需要计算缩放
@@ -292,9 +332,6 @@ namespace SS.UIComponent
 
             if (icons.Count == 0 && _gifs.Count == 0)
             {
-#if UNITY_EDITOR
-                Debug.Log($"Dont has icons and gifs");
-#endif
                 return (0, 0);
             }
             
@@ -624,16 +661,11 @@ namespace SS.UIComponent
         {
             if (!_gifs.TryGetValue(gifInfo, out var verts))
             {
-#if UNITY_EDITOR
-                Debug.Log($"Can't Play Gif: {gifInfo.Content}, not found in _gifs");
-#endif
+                Debug.LogWarning($"Can't play GIF '{gifInfo.Content}': not found in the current icon image.");
                 return;
             }
 
             var offsetScale = UV2OffsetScale(verts[3].uv0.x, verts[3].uv0.y, verts[1].uv0.x, verts[1].uv0.y);
-#if UNITY_EDITOR
-            Debug.Log($"Play Gif: {gifInfo.Content}, offset and scale: {offsetScale}");
-#endif
             _gifOffsetSclaes[gifInfo.Content] = offsetScale;
         }
 
