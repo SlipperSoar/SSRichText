@@ -2,17 +2,25 @@
     "name": "com.github-slippersoar.ssrichtext",
     "displayName": "SSRichText",
     "version": "2.0.0",
-    "description": "A Legacy Rich Text UI Component for Unity",
-    "unity": "2020.3",
+    "description": "Rich text for Unity legacy UGUI Text: outline, shadow, underline, strikethrough, gradient, link, inline icon and GIF support with a unified click event.",
+    "unity": "2021.2",
     "keywords": [
         "richtext",
-        "unity"
+        "rich-text",
+        "text",
+        "ugui",
+        "ui",
+        "unity",
+        "unity-package",
+        "gif",
+        "icon"
     ],
     "author": {
         "name": "SlipperSoar",
         "url": "https://github.com/SlipperSoar"
     },
     "license": "MIT",
-    "licensesUrl": "https://github.com/SlipperSoar/SSRichText/LICENSE",
-    "documentationUrl": "https://github.com/SlipperSoar/SSRichText"
+    "licensesUrl": "https://github.com/SlipperSoar/SSRichText/blob/main/LICENSE",
+    "documentationUrl": "https://github.com/SlipperSoar/SSRichText#readme",
+    "changelogUrl": "https://github.com/SlipperSoar/SSRichText/blob/main/CHANGELOG.md"
 }

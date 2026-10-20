@@ -1,72 +1,84 @@
 # SSRichText
-Unity UGUI RichText
 
-实现思路来自：[ZUIRichText](https://github.com/172672672/UGUI-RichText)
+基于 Unity 旧版 UI Text（UGUI Legacy Text）的富文本组件：在原生 `<b>`、`<i>`、`<size>`、`<color>` 之外，额外支持描边、阴影、下划线、删除线、渐变、链接、内联图标与 GIF 动图，并提供统一的点击回调。
 
-GIF解码思路来自：[UnityGif](https://github.com/SleepyLoser/UnityGif) 和 [GIF图解和压缩详解](https://blog.csdn.net/wzy198852/article/details/17266507)
+> 扩展的是 `UnityEngine.UI.Text`，**不适用于 TextMeshPro**。
 
-使用的图标来自：
-[阿里图标库大头贴](https://www.iconfont.cn/collections/detail?spm=a313x.collections_index.i1.d9df05512.168b3a81l8GbZU&cid=50743)
-[阿里图标库多彩小植物](https://www.iconfont.cn/collections/detail?spm=a313x.collections_index.i1.d9df05512.675d3a81CPSoFN&cid=50664)
+完整文档、示例与更新日志请见仓库主页：<https://github.com/SlipperSoar/SSRichText#readme>
 
-使用的GIF图来自**网络**
+## 环境要求
 
-## 支持
+- Unity 2021.2 及以上（代码使用 C# 9 语法；2021.3.27f1 实测）
+- UGUI（`com.unity.ugui`）的 Legacy `Text`
+- 无其它运行时依赖
 
-Unity版本：Unity2020或以上经过测试可用，Unity2019及以下或Unity6均未测试
+## 安装
 
-支持的富文本标签：
+`Window > Package Manager` → `+` → `Add package from git URL...`：
 
-|                         标签                          | 效果  |                     注释                      |
-|:---------------------------------------------------:|:---:|:-------------------------------------------:|
-|                      \<b>\</b>                      | 粗体  |                   unity原生                   |
-|                      \<i>\</i>                      | 斜体  |                   unity原生                   |
-|                   \<size>\</size>                   | 大小  |                   unity原生                   |
-|                \<color=red>\</color>                | 颜色  |                   unity原生                   |
-|                      \<s>\</s>                      | 删除线 |   颜色与字体颜色相同，线宽根据字体大小动态变化   |
-|              \<outline=red>\</outline>              | 描边  |   \<outline=red>或\<outline=#ffffffff>设置颜色   |
-|               \<shadow=rt>\</shadow>                | 阴影  |       lt、rt、lb、rb分别表示左上、右上、左下、右下的阴影方向       |
-|                    \<icon=xxxx/>                    | 图标  |             需要配合IconProvider使用              |
-|            \<underline=red>\</underline>            | 下划线 | \<underline=red>或\<underline=#ffffffff>设置颜色 |
-|                 \<link=url>\</link>                 | 链接  |               url可以填写具体的链接地址                |
-|                   \<gif=xxxx/>                      | 动图  |        需要配合GifDecoder和LoadManager使用         |
-| \<gradient lt=red rt=red lb=red rb=red>\</gradient> | 渐变  |               需要填写四个顶点（四角）的颜色               |
+```text
+https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText
+```
 
-支持富文本点击事件：
+需要固定版本时追加 tag，例如 `#v2.0.0`。
 
-|         标签          |  事件消息   |       参数       |                       备注                        |
-|:-------------------:|:-------:|:--------------:|:-----------------------------------------------:|
-| \<link=url>\</link> | OnClick |   type, url    |                        -                        |
-|    \<icon=xxxx/>    | OnClick | type, iconName |                        -                        |
-|    \<gif=xxxx/>     | OnClick | type, gifName  |                        -                        |
-|         默认          | OnClick |   type, 文本内容   | 包含outline、underline、shadow以及原生支持的color、size、b、i |
+## 使用
 
-## 使用方法
+1. 在 Canvas 下通过 `GameObject > UI > SS > Rich Text` 创建，或 `Add Component` 搜索 `UI/SS/RichText`。
+2. 在 `Text` 中输入标签文本，例如 `<outline=#000000>描边</outline>`、`<icon=heart/>`、`<gif=cat/>`。
+3. 订阅点击事件：
 
-### 通过upm安装custom package
+```csharp
+using SS.UIComponent;
+using UnityEngine;
 
-1. 打开Unity Package Manager
-2. 点击+ -> Add package from git URL...
-3. 填写git URL：https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText
+public class RichTextExample : MonoBehaviour
+{
+    [SerializeField] private RichText richText;
 
-### 通过.unitypackage安装
+    private void Start()
+    {
+        richText.OnClick += (type, message) =>
+        {
+            if (type == RichText.RichType.Link)
+            {
+                Application.OpenURL(message);
+            }
+        };
+    }
+}
+```
 
-1. 前往[releases](https://github.com/SlipperSoar/SSRichText/releases)下载.unitypackage
-2. 拖入UnityEditor
+## 支持的标签
 
-## 已实现或规划中功能
+| 标签 | 示例 | 说明 |
+| --- | --- | --- |
+| 粗体 | `<b>text</b>` | 原生 |
+| 斜体 | `<i>text</i>` | 原生 |
+| 字号 | `<size=24>text</size>` | 原生 |
+| 颜色 | `<color=#ff8844>text</color>` | 原生，支持颜色名与 6/8 位十六进制 |
+| 删除线 | `<s>text</s>` | 颜色跟随文字颜色 |
+| 描边 | `<outline=red>text</outline>` | 必须带颜色参数 |
+| 阴影 | `<shadow=rb>text</shadow>` | `lt` / `rt` / `lb` / `rb` 四个方向 |
+| 下划线 | `<underline=red>text</underline>` | 必须带颜色参数 |
+| 渐变 | `<gradient lt=red rt=red lb=red rb=red>text</gradient>` | 四个角的颜色 |
+| 链接 | `<link=https://unity.com>text</link>` | 需带协议头 |
+| 图标 | `<icon=heart/>` | 默认从 `Resources` 读取 `Sprite` |
+| 动图 | `<gif=cat/>` | 默认从 `Resources` 读取 `.bytes` |
 
-- [x] outline描边标签
-- [x] shadow阴影标签
-- [x] underline下划线标签
-- [x] icon图标标签
-- [x] link标签
-- [x] 富文本点击事件
-- [x] GIF显示在富文本
-- [x] s删除线标签
-- [ ] <s>GIF的文本渲染到帧图上</s>(文本扩展块**不参与画面渲染**)
-- [x] gradient渐变
+## 点击事件
 
-# 效果图
+```csharp
+public event Action<RichText.RichType, string> OnClick;
+```
 
-![效果](DocImages/PixPin_2025-12-31_18-25-59.png)
+`<link>`、`<icon>`、`<gif>` 返回标签中的地址或名称，其它标签返回被包裹的文本。标签重叠时按 `RichType` 枚举顺序触发优先级最高者。
+
+## 图标与动图
+
+- 图标：实现 `IIconProvider` 后通过 `richText.SetIconProvider(provider)` 或 `RichText.GlobalIconProvider` 替换默认的 `Resources` 加载。
+- 动图：导入 `.gif` 时会自动转成 `.bytes`；运行时由 `GifLoadManager`（自动创建、`DontDestroyOnLoad`）解析与播放，也可通过 `IGifProvider`、`AddGifData` 接入自定义来源。
+
+## 许可证
+
+[MIT](https://github.com/SlipperSoar/SSRichText/blob/main/LICENSE)
