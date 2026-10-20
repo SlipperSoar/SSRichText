@@ -45,7 +45,7 @@ https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText
 需要固定版本时在末尾追加 tag，例如：
 
 ```text
-https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText#v2.2.0
+https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText#v2.3.0
 ```
 
 也可以直接写进 `Packages/manifest.json`：
@@ -53,7 +53,7 @@ https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText#v2.2.0
 ```json
 {
   "dependencies": {
-    "com.github-slippersoar.ssrichtext": "https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText#v2.2.0"
+    "com.github-slippersoar.ssrichtext": "https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText#v2.3.0"
   }
 }
 ```
@@ -252,7 +252,11 @@ GifLoadManager.Instance.AddGifData(
 
 ```text
 Assets/SSRichText/                 # 可独立分发的 UPM 包
-  Runtime/Scripts/                 # RichText、IconProvider、GIF 解码与加载
+  Runtime/Scripts/RichText.cs            # 组件入口：生命周期、网格填充、点击
+  Runtime/Scripts/RichText.Parser.cs     # 标签解析与解析缓存
+  Runtime/Scripts/RichText.Mesh.cs       # 描边/阴影/渐变/图标/GIF/划线
+  Runtime/Scripts/RichText.Types.cs      # 标签类型与数据结构
+  Runtime/Scripts/                       # IconProvider、RichTextIconImage、GIF 解码与加载
   Runtime/Shaders/                 # 图标/动图合并贴图用的 Shader
   Editor/                          # GIF Viewer 与导入处理（独立 Editor 程序集）
 Assets/Scenes/SampleScene.unity    # 示例场景

@@ -45,7 +45,7 @@ https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText
 To pin a version, append a tag:
 
 ```text
-https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText#v2.2.0
+https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText#v2.3.0
 ```
 
 Or add it to `Packages/manifest.json` directly:
@@ -53,7 +53,7 @@ Or add it to `Packages/manifest.json` directly:
 ```json
 {
   "dependencies": {
-    "com.github-slippersoar.ssrichtext": "https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText#v2.2.0"
+    "com.github-slippersoar.ssrichtext": "https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText#v2.3.0"
   }
 }
 ```
@@ -252,7 +252,11 @@ GifLoadManager.Instance.AddGifData(
 
 ```text
 Assets/SSRichText/                 # Distributable UPM package
-  Runtime/Scripts/                 # RichText, IconProvider, GIF decoding/loading
+  Runtime/Scripts/RichText.cs            # Component: lifecycle, mesh fill, clicks
+  Runtime/Scripts/RichText.Parser.cs     # Tag parsing and parse cache
+  Runtime/Scripts/RichText.Mesh.cs       # Outline/shadow/gradient/icon/GIF/lines
+  Runtime/Scripts/RichText.Types.cs      # Tag types and data structures
+  Runtime/Scripts/                       # IconProvider, RichTextIconImage, GIF decoding/loading
   Runtime/Shaders/                 # Shaders used to merge icon/GIF textures
   Editor/                          # GIF Viewer and import handling (separate editor assembly)
 Assets/Scenes/SampleScene.unity    # Sample scene

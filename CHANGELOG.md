@@ -4,6 +4,14 @@
 
 ## [Unreleased]
 
+## [2.3.0] - 2026-10-20
+
+### Changed
+
+- `RichText.cs` 拆分为四个 partial 文件：主组件、`RichText.Parser.cs`（解析）、`RichText.Mesh.cs`（网格效果）、`RichText.Types.cs`（类型与数据结构）。
+- 增加文本解析缓存：文本未变化时复用解析结果，不再重复执行正则和标签处理；每次重建克隆一份数据，避免网格构建与图标更新协程互相影响。
+- 移除未使用的 `spaceWidth` 字段。
+
 ## [2.2.0] - 2026-10-20
 
 ### Added
@@ -112,7 +120,8 @@
 
 - 首个版本：基于 Unity 原生 UI Text 的富文本组件。
 
-[Unreleased]: https://github.com/SlipperSoar/SSRichText/compare/v2.2.0...HEAD
+[Unreleased]: https://github.com/SlipperSoar/SSRichText/compare/v2.3.0...HEAD
+[2.3.0]: https://github.com/SlipperSoar/SSRichText/compare/v2.2.0...v2.3.0
 [2.2.0]: https://github.com/SlipperSoar/SSRichText/compare/v2.1.0...v2.2.0
 [2.1.0]: https://github.com/SlipperSoar/SSRichText/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/SlipperSoar/SSRichText/compare/v1.9.0...v2.0.0
