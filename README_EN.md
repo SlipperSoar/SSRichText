@@ -45,7 +45,7 @@ https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText
 To pin a version, append a tag:
 
 ```text
-https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText#v2.3.1
+https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText#v2.4.0
 ```
 
 Or add it to `Packages/manifest.json` directly:
@@ -53,7 +53,7 @@ Or add it to `Packages/manifest.json` directly:
 ```json
 {
   "dependencies": {
-    "com.github-slippersoar.ssrichtext": "https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText#v2.3.1"
+    "com.github-slippersoar.ssrichtext": "https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText#v2.4.0"
   }
 }
 ```
@@ -204,7 +204,7 @@ Notes:
 Runtime behavior:
 
 - On first use a `GifLoadManager` is created automatically (`DontDestroyOnLoad`), decodes the bytes in a coroutine and plays frames in one place.
-- GIF data that has not been used for 120 seconds is released; pass `dontClear: true` to keep it resident.
+- GIF data that has not been used for 120 seconds is released (adjust with `GifLoadManager.UnloadCountDownSeconds`); pass `dontClear: true` to keep it resident. The number of concurrent decodes can be changed with `GifLoadManager.MaxConcurrentLoads` (default 2).
 - Custom byte sources: implement `IGifProvider.GetGifBytes(string gifName)` and assign it to `GifLoadManager.Instance.GifProvider`.
 - Frame sequences can also be injected directly with `AddGifData`:
 

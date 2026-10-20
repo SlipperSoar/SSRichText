@@ -4,6 +4,16 @@
 
 ## [Unreleased]
 
+## [2.4.0] - 2026-10-20
+
+### Changed
+
+- GIF 的 LZW 解码改为前缀表 + 后缀字节实现，去掉 `Dictionary<int, string>` 与字符串拼接；子数据块改为记录区间后 `Buffer.BlockCopy` 一次性拷贝。
+- 解码时复用 LZW 表、栈和像素上传缓冲，避免每帧分配大数组。
+- 图标/动图合图增加内容签名缓存：图标集合未变化时复用 `RenderTexture`，只重新应用 UV，不再重复 Blit。
+- GIF Viewer 的帧列表只绘制滚动可见区域，避免大 GIF 每帧重绘全部帧。
+- `GifLoadManager.UnloadCountDownSeconds` 与 `MaxConcurrentLoads` 改为可配置（默认 120 秒 / 2）。
+
 ## [2.3.1] - 2026-10-20
 
 ### Fixed
@@ -134,7 +144,8 @@
 
 - 首个版本：基于 Unity 原生 UI Text 的富文本组件。
 
-[Unreleased]: https://github.com/SlipperSoar/SSRichText/compare/v2.3.1...HEAD
+[Unreleased]: https://github.com/SlipperSoar/SSRichText/compare/v2.4.0...HEAD
+[2.4.0]: https://github.com/SlipperSoar/SSRichText/compare/v2.3.1...v2.4.0
 [2.3.1]: https://github.com/SlipperSoar/SSRichText/compare/v2.3.0...v2.3.1
 [2.3.0]: https://github.com/SlipperSoar/SSRichText/compare/v2.2.0...v2.3.0
 [2.2.0]: https://github.com/SlipperSoar/SSRichText/compare/v2.1.0...v2.2.0

@@ -72,13 +72,13 @@ namespace SS.UIComponent
 
         #endregion
 
-        #region const
+        #region settings
 
-        /// <summary>Gif数据卸载倒计时（秒）</summary>
-        private const int UNLOAD_COUNT_DOWN_SECOND = 120;
+        /// <summary>GIF 数据闲置多久后卸载（秒），默认 120</summary>
+        public static int UnloadCountDownSeconds { get; set; } = 120;
 
-        /// <summary>最大同时加载数量，避免一次性加载太多导致卡顿（即使是协程）</summary>
-        private const int LOAD_MAX_COUNT = 2;
+        /// <summary>同时解码的 GIF 数量上限，默认 2；设置过大会增加一次性解码造成的卡顿</summary>
+        public static int MaxConcurrentLoads { get; set; } = 2;
 
         #endregion
         
@@ -144,7 +144,7 @@ namespace SS.UIComponent
                     continue;
                 }
 
-                if (gifData.Value.LastUseTime + UNLOAD_COUNT_DOWN_SECOND <= Time.time && gifLoadStatus[gifData.Key])
+                if (gifData.Value.LastUseTime + UnloadCountDownSeconds <= Time.time && gifLoadStatus[gifData.Key])
                 {
                     removeList.Add(gifData.Key);
                 }
@@ -261,7 +261,7 @@ namespace SS.UIComponent
                 gifLoadStatus[gifName] = false;
                 
                 // 检查数量，超过最大同时加载数量时放入队列等待
-                if (loadingCount >= LOAD_MAX_COUNT)
+                if (loadingCount >= MaxConcurrentLoads)
                 {
                     // 等待
                     waitingQueue.Enqueue((gifName, forceBgColorTransparent));
@@ -372,7 +372,7 @@ namespace SS.UIComponent
             while (true)
             {
                 // 检查等待队列
-                if (loadingCount < LOAD_MAX_COUNT && waitingQueue.Count > 0)
+                if (loadingCount < MaxConcurrentLoads && waitingQueue.Count > 0)
                 {
                     var (gifName, forceBgColorTransparent) = waitingQueue.Dequeue();
                     LoadGif(gifName, forceBgColorTransparent);

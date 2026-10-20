@@ -398,12 +398,17 @@ namespace SS.UIComponent
             IGifExtensionBlock extensionBlock = null;
             Color32[] prevColors = null;
             var screenSize = screenWidth * screenHeight;
+            // 复用的临时缓冲，避免每帧分配大数组和 LZW 表
+            var uploadBuffer = new Color32[screenSize];
+            var lzwPrefix = new int[MAX_CODE_TABLE_SIZE];
+            var lzwSuffix = new byte[MAX_CODE_TABLE_SIZE];
+            var lzwStack = new byte[MAX_CODE_TABLE_SIZE];
             while (bytes[byteIndex] != GIF_END_SIGNATURE)
             {
                 var blockFlag = bytes[byteIndex++];
                 if (blockFlag == GIF_SIGNATURE)
                 {
-                    var imageBlock = ReadImageDataBlock(bytes, screenSize, ref byteIndex);
+                    var imageBlock = ReadImageDataBlock(bytes, screenSize, ref byteIndex, lzwPrefix, lzwSuffix, lzwStack);
                     if (imageBlock.UseInterlace)
                     {
 #if UNITY_EDITOR
@@ -422,7 +427,7 @@ namespace SS.UIComponent
                     }
 
                     var frame = ProcessTexturePixels(texture, imageBlock, bgColor, extensionBlock as GifGraphicExtensionBlock,
-                        usingColorTable, prevColors, out var colors);
+                        usingColorTable, prevColors, uploadBuffer, out var colors);
                     frames.Add(frame);
                     yield return null;
 
@@ -445,7 +450,8 @@ namespace SS.UIComponent
 
         #region Private Methods
 
-        private static ImageBlock ReadImageDataBlock(byte[] bytes, int screenSize, ref int byteIndex)
+        private static ImageBlock ReadImageDataBlock(byte[] bytes, int screenSize, ref int byteIndex,
+            int[] lzwPrefix, byte[] lzwSuffix, byte[] lzwStack)
         {
             Color32[] localColorTable = null;
             // 每个图像块：1字节标识符 + 2字节 x offset + 2字节 y offset  + 2字节宽度 + 2字节高度 + 1字节标志（像上面逻辑屏幕标识符一样）
@@ -494,8 +500,8 @@ namespace SS.UIComponent
 #endif
             var clearCode = lzwSize;
             
-            // 读取所有的子数据块并合并成完整的数据流
-            var totalData = new List<byte>();
+            // 读取所有的子数据块：先记录区间，再一次性拷贝，避免逐字节 Add
+            var segments = new List<(int offset, int size)>();
             var totalSize = 0;
             while (true)
             {
@@ -506,23 +512,35 @@ namespace SS.UIComponent
 #endif
                     break;
                 }
+
                 var size = bytes[byteIndex++];
                 if (size == GIF_BLOCK_END_FLAG)
                 {
                     break;
                 }
 
-                totalSize += size;
-                totalData.Capacity = totalSize;
-                for (int i = 0; i < size; i++)
+                if (byteIndex + size > bytes.Length)
                 {
-                    totalData.Add(bytes[byteIndex++]);
+#if UNITY_EDITOR
+                    Debug.LogError($"LZW data exceeds buffer, byteIndex: {byteIndex}, size: {size}, bytes.Length: {bytes.Length}");
+#endif
+                    break;
                 }
+
+                segments.Add((byteIndex, size));
+                byteIndex += size;
+                totalSize += size;
             }
 
-            // 将整个字节数据流转换成bit数据流并用于解码
-            var bitData = new BitArray(totalData.ToArray());
-            var decodedBytes = DecodeImageBlockData(bitData, clearCode, lzwMinCodeSize, imageSize);
+            var lzwData = new byte[totalSize];
+            var writeIndex = 0;
+            foreach (var segment in segments)
+            {
+                Buffer.BlockCopy(bytes, segment.offset, lzwData, writeIndex, segment.size);
+                writeIndex += segment.size;
+            }
+
+            var decodedBytes = DecodeImageBlockData(lzwData, clearCode, lzwMinCodeSize, imageSize, lzwPrefix, lzwSuffix, lzwStack);
 #if UNITY_EDITOR
             Log($"decoded bytes: {decodedBytes?.Length}");
 #endif
@@ -539,142 +557,130 @@ namespace SS.UIComponent
             };
         }
 
-        private static byte[] DecodeImageBlockData(BitArray imageData, int clearCode, int lzwMinCodeSize, int imageSize)
+        /// <summary>
+        /// GIF 的 LZW 解码。使用前缀表 + 后缀字节代替 Dictionary&lt;int, string&gt;，避免大量字符串拼接和 GC
+        /// </summary>
+        private static byte[] DecodeImageBlockData(byte[] data, int clearCode, int lzwMinCodeSize, int imageSize,
+            int[] prefix, byte[] suffix, byte[] stack)
         {
-            // key是索引，value是像素颜色在颜色表中的索引，每个索引用一个byte表示，这里用char组成的string比较方便
-            var codeTable = new Dictionary<int, string>();
+            var maxCodeTableSize = MAX_CODE_TABLE_SIZE;
 
             var output = new byte[imageSize];
             var outputIndex = 0;
-            // 起始读取位大小
-            int codeSize;
-            var endCode = clearCode + 1;
-            // 当前所能表示的最大表大小
-            int maxTableSize;
-            var bitIndex = 0;
 
-            string prevStr;
-            var codeStr = string.Empty;
-            
-            void InitTable()
+            // prefix: 当前 code 对应的前缀 code；suffix: 当前 code 的最后一个字节
+
+            var endCode = clearCode + 1;
+            var codeSize = lzwMinCodeSize + 1;
+            var maxTableSize = 1 << codeSize;
+            var nextCode = clearCode + 2;
+            var oldCode = -1;
+            byte firstChar = 0;
+
+            var bitBuffer = 0;
+            var bitCount = 0;
+            var dataIndex = 0;
+
+            int ReadCode()
             {
-                codeTable.Clear();
-                // 初始化编码表
-                for (int i = 0; i < clearCode + 2; i++)
+                while (bitCount < codeSize)
                 {
-                    codeTable[i] = ((char)i).ToString();
+                    if (dataIndex >= data.Length)
+                    {
+                        return -1;
+                    }
+
+                    bitBuffer |= data[dataIndex++] << bitCount;
+                    bitCount += 8;
                 }
 
+                var code = bitBuffer & ((1 << codeSize) - 1);
+                bitBuffer >>= codeSize;
+                bitCount -= codeSize;
+                return code;
+            }
+
+            void ResetTable()
+            {
                 codeSize = lzwMinCodeSize + 1;
                 maxTableSize = 1 << codeSize;
-                prevStr = string.Empty;
+                nextCode = clearCode + 2;
+                oldCode = -1;
+                firstChar = 0;
             }
-            
-            InitTable();
-            
-#if UNITY_EDITOR
-            Log($"[LZW Decode] Clear Code: {clearCode}, code size (lzw min code size + 1): {codeSize}");
-#endif
-            
-            while (bitIndex < imageData.Length)
+
+            ResetTable();
+
+            while (outputIndex < imageSize)
             {
-                // 从bit数组中按照size大小读取对应长度并转换成数值
-                // Gif使用低位在前，高位在后（从右往左）的存储顺序
-                var value = imageData.GetValue(ref bitIndex, codeSize);
-                
-                // clearCode表示重置编码表
-                if (value == clearCode)
+                var code = ReadCode();
+                if (code < 0)
                 {
-#if UNITY_EDITOR
-                    Log($"[LZW Decode] Code Table Reset With Clear Code, code table size: {codeTable.Count}, code size: {codeSize}");
-#endif
-                    InitTable();
+                    break;
+                }
+
+                if (code == clearCode)
+                {
+                    ResetTable();
                     continue;
                 }
-                // clearCode + 1表示结束标志
-                else if (value == endCode)
-                {
-#if UNITY_EDITOR
-                    Log($"[LZW Decode] Decode LZW End With:  clear code + 1");
-#endif
-                    break;
-                }
-                else if (codeTable.ContainsKey(value))
-                {
-                    codeStr = codeTable[value];
-                    // 获取当前code对应的字符
-                    // 编码表包含当前编码
-                    // 获取当前code对应的字符
-                    for (int i = 0; i < codeStr.Length; i++)
-                    {
-                        output[outputIndex++] = (byte)codeStr[i];
-                    }
-                    
-                    // 将当前字符添加到编码表中
-                    if (!string.IsNullOrEmpty(prevStr))
-                    {
-                        codeTable.Add(codeTable.Count, prevStr + codeStr[0]);
-                    }
-                }
-                // 编码表不包含当前编码
-                else
-                {
-                    // 如果没有在编码表中找到，说明在编码时，这个prefix是被前一步新加进编码表的
-                    // 而这个新的编码是由上一步输出完索引后， 将prefix+c添加进的编码表，然后将prefix = 新字符
-                    // 在这之后接着产生这个找不到的索引，它对应的“编码时”prefix的首个字符应当和之前的prefix的首个字符相同，否则不会是编码表中的最新编码
-                    if (!string.IsNullOrEmpty(prevStr))
-                    {
-                        codeStr = prevStr + prevStr[0];
-                        for (int i = 0; i < codeStr.Length; i++)
-                        {
-                            output[outputIndex++] = (byte)codeStr[i];
-                        }
-                        // 将当前字符添加到编码表中
-                        codeTable.Add(codeTable.Count, codeStr);
-                    }
-                    else
-                    {
-#if UNITY_EDITOR
-                        Debug.LogError($"[LZW Decode] Should not happen, index value: {value}, code table size: {codeTable.Count}, lzw min size: {lzwMinCodeSize}, code size: {codeSize}");
-#endif
-                        continue;
-                    }
-                }
 
-                prevStr = codeStr;
-
-                // 数据够了
-                if (outputIndex >= imageSize)
+                if (code == endCode)
                 {
                     break;
                 }
 
-                // if (codeTable.Count >= MAX_CODE_TABLE_SIZE)
-                // {
-                //     value = imageData.GetValue(ref bitIndex, codeSize);
-                //     if (value != clearCode)
-                //     {
-                //         Debug.Log($"[LZW Decode] Reset Code Table Because Code Table Size >= Max Table Size, but value is not clear code: {value}, code table size: {codeTable.Count}, code size: {codeSize}, max table size: {maxTableSize}");
-                //         InitTable();
-                //     }
-                //     else
-                //     {
-                //         bitIndex -= codeSize;
-                //     }
-                //
-                //     continue;
-                // }
-
-                // 检查并根据情况调整codeSize
-                if (codeTable.Count >= maxTableSize && codeSize < 12)
+                if (code > nextCode)
                 {
-                    codeSize++;
-                    maxTableSize = 1 << codeSize;
 #if UNITY_EDITOR
+                    Debug.LogError($"[LZW Decode] Invalid code: {code}, next code: {nextCode}");
 #endif
+                    break;
                 }
 
-                // Debug.Log($"Code: {value}, table count: {codeTable.Count}, bit index: {bitIndex}, data length: {imageData.Length}, code size: {codeSize}");
+                var stackSize = 0;
+                var currentCode = code;
+                if (code == nextCode)
+                {
+                    // KwKwK：这个 code 还没有进表，它对应的序列是上一个序列 + 它的首字符
+                    if (oldCode < 0)
+                    {
+                        break;
+                    }
+
+                    stack[stackSize++] = firstChar;
+                    currentCode = oldCode;
+                }
+
+                while (currentCode >= clearCode)
+                {
+                    stack[stackSize++] = suffix[currentCode];
+                    currentCode = prefix[currentCode];
+                }
+
+                firstChar = (byte)currentCode;
+                stack[stackSize++] = firstChar;
+
+                while (stackSize > 0 && outputIndex < imageSize)
+                {
+                    output[outputIndex++] = stack[--stackSize];
+                }
+
+                // 把 oldCode + firstChar 加入编码表
+                if (oldCode >= 0 && nextCode < maxCodeTableSize)
+                {
+                    prefix[nextCode] = oldCode;
+                    suffix[nextCode] = firstChar;
+                    nextCode++;
+
+                    if (nextCode >= maxTableSize && codeSize < MAX_BIT_CODE_COUNT)
+                    {
+                        codeSize++;
+                        maxTableSize <<= 1;
+                    }
+                }
+
+                oldCode = code;
             }
 
             return output;
@@ -741,7 +747,8 @@ namespace SS.UIComponent
         }
 
         private static GifData ProcessTexturePixels(Texture2D texture2D, ImageBlock imageBlock, Color32 bgColor,
-            GifGraphicExtensionBlock graphicExtensionBlock, Color32[] colorTable, Color32[] prevColors, out Color32[] colors)
+            GifGraphicExtensionBlock graphicExtensionBlock, Color32[] colorTable, Color32[] prevColors,
+            Color32[] uploadBuffer, out Color32[] colors)
         {
             var width = texture2D.width;
             var height = texture2D.height;
@@ -844,7 +851,12 @@ namespace SS.UIComponent
 
             // SetPixels32 的原点在左下，而解码结果是从上到下排列的，翻转行序后一次性上传，
             // 比逐像素 SetPixel 快一个数量级（帧多时尤其明显）
-            var textureColors = new Color32[imageSize];
+            if (uploadBuffer == null || uploadBuffer.Length != imageSize)
+            {
+                uploadBuffer = new Color32[imageSize];
+            }
+
+            var textureColors = uploadBuffer;
             for (int i = 0; i < height; i++)
             {
                 Array.Copy(colors, i * width, textureColors, (height - i - 1) * width, width);

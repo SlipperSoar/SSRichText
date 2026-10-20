@@ -13,7 +13,6 @@ namespace SS.Editor
     public class GIFViewerWindow : EditorWindow
     {
         private const float PreviewSize = 128f;
-        private const int MaxHorizontalCount = 4;
         private const string WindowTitle = "GIF Viewer";
 
         /// <summary>每次 Editor 更新最多用于推进解码的时间（秒），避免长时间阻塞编辑器</summary>
@@ -157,37 +156,54 @@ namespace SS.Editor
         }
 
         /// <summary>
-        /// 以网格形式列出所有帧
+        /// 以网格形式列出帧，只绘制滚动区域内的帧，避免大 GIF 每帧重绘全部纹理
         /// </summary>
         private void DrawAllFrames()
         {
-            scrollPosition = GUILayout.BeginScrollView(scrollPosition);
-
-            var currentHorizontalCount = 0;
-            for (var i = 0; i < gifFrames.Count; i++)
+            if (gifFrames == null || gifFrames.Count == 0)
             {
-                if (currentHorizontalCount == 0)
-                {
-                    GUILayout.BeginHorizontal();
-                }
-
-                GUILayout.BeginVertical();
-                var frameData = gifFrames[i];
-                GUILayout.Label($"Frame {i}, Delay: {frameData.DelaySecond} s");
-                var rect = GUILayoutUtility.GetRect(PreviewSize, PreviewSize);
-                GUI.DrawTexture(rect, frameData.FrameTexture, ScaleMode.ScaleToFit);
-                GUILayout.EndVertical();
-
-                if (currentHorizontalCount == MaxHorizontalCount - 1 || i == gifFrames.Count - 1)
-                {
-                    GUILayout.EndHorizontal();
-                }
-
-                currentHorizontalCount++;
-                currentHorizontalCount %= MaxHorizontalCount;
+                return;
             }
 
-            GUILayout.EndScrollView();
+            const float padding = 8f;
+            const float labelHeight = 18f;
+            var cellWidth = PreviewSize + padding;
+            var cellHeight = PreviewSize + labelHeight + padding;
+
+            var viewHeight = Mathf.Max(120f, position.height - 260f);
+            var viewRect = GUILayoutUtility.GetRect(1f, viewHeight, GUILayout.ExpandWidth(true));
+            var contentWidth = Mathf.Max(PreviewSize, viewRect.width - 20f);
+            var columns = Mathf.Max(1, Mathf.FloorToInt(contentWidth / cellWidth));
+            var rows = Mathf.CeilToInt(gifFrames.Count / (float)columns);
+            var contentRect = new Rect(0f, 0f, contentWidth, rows * cellHeight);
+
+            scrollPosition = GUI.BeginScrollView(viewRect, scrollPosition, contentRect);
+
+            var firstRow = Mathf.Max(0, Mathf.FloorToInt(scrollPosition.y / cellHeight) - 1);
+            var lastRow = Mathf.Min(rows - 1,
+                Mathf.CeilToInt((scrollPosition.y + viewRect.height) / cellHeight) + 1);
+
+            for (var row = firstRow; row <= lastRow; row++)
+            {
+                for (var column = 0; column < columns; column++)
+                {
+                    var index = row * columns + column;
+                    if (index >= gifFrames.Count)
+                    {
+                        break;
+                    }
+
+                    var x = column * cellWidth;
+                    var y = row * cellHeight;
+                    var frameData = gifFrames[index];
+                    GUI.Label(new Rect(x, y, PreviewSize, labelHeight),
+                        $"Frame {index}, Delay: {frameData.DelaySecond} s");
+                    GUI.DrawTexture(new Rect(x, y + labelHeight, PreviewSize, PreviewSize),
+                        frameData.FrameTexture, ScaleMode.ScaleToFit);
+                }
+            }
+
+            GUI.EndScrollView();
         }
 
         /// <summary>

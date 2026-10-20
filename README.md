@@ -45,7 +45,7 @@ https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText
 需要固定版本时在末尾追加 tag，例如：
 
 ```text
-https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText#v2.3.1
+https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText#v2.4.0
 ```
 
 也可以直接写进 `Packages/manifest.json`：
@@ -53,7 +53,7 @@ https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText#v2.3.1
 ```json
 {
   "dependencies": {
-    "com.github-slippersoar.ssrichtext": "https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText#v2.3.1"
+    "com.github-slippersoar.ssrichtext": "https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText#v2.4.0"
   }
 }
 ```
@@ -204,7 +204,7 @@ RichText.GlobalIconProvider = new MyIconProvider();
 运行时行为：
 
 - 首次渲染时自动创建 `GifLoadManager`（`DontDestroyOnLoad`），在后台协程里解析字节数据并按帧延迟统一播放。
-- 120 秒未被使用的 GIF 数据会自动卸载；需要常驻时可以传 `dontClear: true`。
+- 默认 120 秒未被使用的 GIF 数据会自动卸载（可用 `GifLoadManager.UnloadCountDownSeconds` 调整），需要常驻时可以传 `dontClear: true`；同时解码的数量上限可用 `GifLoadManager.MaxConcurrentLoads` 调整（默认 2）。
 - 自定义加载来源：实现 `IGifProvider.GetGifBytes(string gifName)` 并赋给 `GifLoadManager.Instance.GifProvider`。
 - 直接塞入帧动画（不经过 GIF 解析）也可以用 `AddGifData`。
 

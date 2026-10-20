@@ -4,6 +4,7 @@
  * @description Unity Text富文本扩展用的RawImage扩展
  */
 
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -33,6 +34,11 @@ namespace SS.UIComponent
         private RenderTexture rt;
         private Material blitMaterial;
 
+        // 图标/动图集合没变时直接复用合并纹理，避免每次文本重建都重新 Blit
+        private string combineSignature;
+        private Dictionary<string, Vector4> cachedIconUvs;
+        private Dictionary<string, Vector4> cachedGifUvs;
+
         #endregion
         
         #region Public Methods
@@ -44,8 +50,6 @@ namespace SS.UIComponent
             _iconShadows = iconShadows;
             // 先把上次的停了（如果有）
             StopAllGifs();
-            // 旧的合并纹理已经不再使用，先释放，避免每次重建都多占一张 RenderTexture
-            ReleaseRenderTexture();
             _gifs = gifs;
             // 一口气加载
             if (Application.isPlaying)
@@ -53,11 +57,42 @@ namespace SS.UIComponent
                 PrepareGifs();
             }
 
-            if (_sprites.Count == 1 && _gifs.Count == 0)
+            if (_sprites.Count == 0 && _gifs.Count == 0)
+            {
+                ReleaseRenderTexture();
+                texture = null;
+                SetAllDirty();
+                return;
+            }
+
+            var needCombine = !(_sprites.Count == 1 && _gifs.Count == 0) &&
+                              !(_sprites.Count == 0 && _gifs.Count == 1);
+
+            if (needCombine)
+            {
+                var signature = BuildCombineSignature(icons);
+                // 图标集合没变：复用已有的合并纹理，只重新应用 UV 并恢复 GIF 播放
+                if (rt != null && signature == combineSignature && TryApplyCachedCombine())
+                {
+                    texture = rt;
+                    SetAllDirty();
+                    return;
+                }
+
+                // 集合变化时才释放旧纹理并重新合成
+                ReleaseRenderTexture();
+                rt = CombineSprites(icons);
+                texture = rt;
+                combineSignature = signature;
+                return;
+            }
+
+            ReleaseRenderTexture();
+            if (_sprites.Count == 1)
             {
                 ApplySingleSprite(icons[_sprites[0].Content].texture);
             }
-            else if (_sprites.Count == 0 && _gifs.Count == 1)
+            else
             {
                 // 单个动图
                 foreach (var gif in gifs)
@@ -65,11 +100,6 @@ namespace SS.UIComponent
                     ApplySingleGif(gif.Key, gif.Value);
                     break;
                 }
-            }
-            else
-            {
-                rt = CombineSprites(icons);
-                texture = rt;
             }
         }
 
@@ -165,6 +195,11 @@ namespace SS.UIComponent
         /// </summary>
         private void ReleaseRenderTexture()
         {
+            combineSignature = null;
+            cachedIconUvs = null;
+            cachedGifUvs = null;
+            _gifOffsetSclaes.Clear();
+
             if (rt == null)
             {
                 return;
@@ -179,7 +214,78 @@ namespace SS.UIComponent
             rt = null;
         }
 
-        private static void DestroyNativeObject(Object obj)
+        /// <summary>
+        /// 图标集合 + 动图集合的签名，用于判断合并纹理能否复用
+        /// </summary>
+        private string BuildCombineSignature(Dictionary<string, Sprite> icons)
+        {
+            var parts = new List<string>(_sprites.Count + _gifs.Count + 1);
+            foreach (var info in _sprites)
+            {
+                parts.Add(info.Content + ":" + icons[info.Content].GetInstanceID());
+            }
+
+            parts.Sort(StringComparer.Ordinal);
+            parts.Add("#");
+
+            var gifParts = new List<string>(_gifs.Count);
+            foreach (var gif in _gifs)
+            {
+                gifParts.Add(gif.Key.Content);
+            }
+
+            gifParts.Sort(StringComparer.Ordinal);
+            parts.AddRange(gifParts);
+            return string.Join("|", parts);
+        }
+
+        /// <summary>
+        /// 复用合并纹理时，把缓存的 UV 重新应用到新的顶点上
+        /// </summary>
+        private bool TryApplyCachedCombine()
+        {
+            if (cachedIconUvs == null || cachedGifUvs == null)
+            {
+                return false;
+            }
+
+            for (var i = 0; i < _sprites.Count; i++)
+            {
+                if (!cachedIconUvs.TryGetValue(_sprites[i].Content, out var uv))
+                {
+                    return false;
+                }
+
+                ApplyUv(_vertices[i], uv);
+            }
+
+            foreach (var gif in _gifs)
+            {
+                if (!cachedGifUvs.TryGetValue(gif.Key.Content, out var uv))
+                {
+                    return false;
+                }
+
+                ApplyUv(gif.Value, uv);
+                if (Application.isPlaying)
+                {
+                    RefreshGifOffsetScale(gif.Key);
+                    GifLoadManager.Instance.AddGifPlayer(gif.Key.Content, PlayGif);
+                }
+            }
+
+            return true;
+        }
+
+        private static void ApplyUv(UIVertex[] verts, Vector4 uv)
+        {
+            verts[0].uv0 = new Vector2(uv.x, uv.w);
+            verts[1].uv0 = new Vector2(uv.z, uv.w);
+            verts[2].uv0 = new Vector2(uv.z, uv.y);
+            verts[3].uv0 = new Vector2(uv.x, uv.y);
+        }
+
+        private static void DestroyNativeObject(UnityEngine.Object obj)
         {
             if (obj == null)
             {
@@ -188,11 +294,11 @@ namespace SS.UIComponent
 
             if (Application.isPlaying)
             {
-                Object.Destroy(obj);
+                UnityEngine.Object.Destroy(obj);
             }
             else
             {
-                Object.DestroyImmediate(obj);
+                UnityEngine.Object.DestroyImmediate(obj);
             }
         }
 
@@ -314,6 +420,8 @@ namespace SS.UIComponent
             }
 
             RenderTexture.active = prevRT;
+            cachedIconUvs = iconUvs;
+            cachedGifUvs = gifUvs;
             return renderTexture;
         }
 
