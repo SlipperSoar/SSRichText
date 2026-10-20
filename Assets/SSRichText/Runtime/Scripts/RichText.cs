@@ -262,11 +262,11 @@ namespace SS.UIComponent
                 @"^(?:(?:(?:[a-zA-Z0-9](?:[a-zA-Z0-9\-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{2,})|localhost|(?:\d{1,3}(?:\.\d{1,3}){3}))" +
                 @"(?::\d{1,5})?(?:[/?#].*)?$", RegexOptions.IgnoreCase);
 
-        // 图标
-        private static readonly Regex IconRegex = new Regex(@"<icon=([a-zA-Z0-9_\-\(\)\.]+)/>");
+        // 图标（名称支持 Resources 下的子目录，如 Icons/heart）
+        private static readonly Regex IconRegex = new Regex(@"<icon=([a-zA-Z0-9_\-\(\)\.\/\\]+)/>");
 
-        // GIF动图
-        private static readonly Regex GifRegex = new Regex(@"<gif=([a-zA-Z0-9_\-\(\)\.]+)/>");
+        // GIF动图（名称支持 Resources 下的子目录，如 Gifs/cat）
+        private static readonly Regex GifRegex = new Regex(@"<gif=([a-zA-Z0-9_\-\(\)\.\/\\]+)/>");
 
         #endregion
 
@@ -668,14 +668,15 @@ namespace SS.UIComponent
             // 图标
             tags.AddRange(GetTags(resultText, IconRegex, RichType.Icon, true, (str, info) =>
             {
-                info.Content = str;
+                // 统一成 Resources.Load 使用的路径分隔符
+                info.Content = str.Replace('\\', '/');
                 info.Color = Color.white;
             }));
 
             // Gif动图
             tags.AddRange(GetTags(resultText, GifRegex, RichType.Gif, true, (str, info) =>
             {
-                info.Content = str;
+                info.Content = str.Replace('\\', '/');
                 info.Color = Color.white;
             }));
 

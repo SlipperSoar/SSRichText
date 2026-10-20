@@ -1,4 +1,4 @@
-﻿/*
+/*
  * @author SlipperSoar
  * @Created: 2024-12-23
  * @description Gif动图解码
@@ -171,6 +171,20 @@ namespace SS.UIComponent
     
     public static class GifDecoder
     {
+        /// <summary>
+        /// 是否输出解码过程的详细日志。默认关闭；帧数多时打开会明显拖慢解码和预览。
+        /// </summary>
+        public static bool VerboseLog;
+
+        [System.Diagnostics.Conditional("UNITY_EDITOR")]
+        private static void Log(string message)
+        {
+            if (VerboseLog)
+            {
+                Debug.Log(message);
+            }
+        }
+
         #region enum
 
         /// <summary>
@@ -285,7 +299,7 @@ namespace SS.UIComponent
             // 版本：87a或89a
             // var version = header.Substring(3, 3);
 #if UNITY_EDITOR
-            Debug.Log($"Header: {header}");
+            Log($"Header: {header}");
 #endif
             
             // 逻辑屏幕标识符
@@ -310,7 +324,7 @@ namespace SS.UIComponent
             // 像素宽高比
             var pixelAspectRatio = bytes[byteIndex++];
 #if UNITY_EDITOR
-            Debug.Log($"Screen: {screenWidth}x{screenHeight} flag byte: {flagByte}, globalColorTableFlag: {globalColorTableFlag}, colorResolution: {colorResolution}, sortFlag: {sortFlag}, globalColorTableSize: {globalColorTableSize}, backgroundColorIndex: {backgroundColorIndex}, pixelAspectRatio: {pixelAspectRatio}");
+            Log($"Screen: {screenWidth}x{screenHeight} flag byte: {flagByte}, globalColorTableFlag: {globalColorTableFlag}, colorResolution: {colorResolution}, sortFlag: {sortFlag}, globalColorTableSize: {globalColorTableSize}, backgroundColorIndex: {backgroundColorIndex}, pixelAspectRatio: {pixelAspectRatio}");
 #endif
             
             // 当全局颜色表不存在时，背景色用Clear色（无色）
@@ -334,7 +348,7 @@ namespace SS.UIComponent
                     bgColor.a = 0;
                 }
 #if UNITY_EDITOR
-                Debug.Log($"GlobalColorTable Length: {globalColorTable.Length}, background color: {bgColor}");
+                Log($"GlobalColorTable Length: {globalColorTable.Length}, background color: {bgColor}");
 #endif
             }
 
@@ -353,7 +367,7 @@ namespace SS.UIComponent
                     if (imageBlock.UseInterlace)
                     {
 #if UNITY_EDITOR
-                        Debug.Log($"Decode interlace data");
+                        Log($"Decode interlace data");
 #endif
                         imageBlock.ImageData= ProcessInterlaceData(imageBlock, screenWidth, screenHeight);
                     }
@@ -381,7 +395,7 @@ namespace SS.UIComponent
                 else
                 {
 #if UNITY_EDITOR
-                    Debug.Log($"unknown block flag: {blockFlag}({blockFlag:x2})");
+                    Log($"unknown block flag: {blockFlag}({blockFlag:x2})");
 #endif
                 }
             }
@@ -409,7 +423,7 @@ namespace SS.UIComponent
             var sortFlag = (flagByte & 0b00100000) != 0;
             var localColorTableSize = 2 << (flagByte & 0b00000111);
 #if UNITY_EDITOR
-            Debug.Log($"Image: ({xOffset},{yOffset}), {width}x{height}, localColorTableFlag: {localColorTableFlag}, interlaceFlag: {interlaceFlag}, sortFlag: {sortFlag}, localColorTableSize: {localColorTableSize}");
+            Log($"Image: ({xOffset},{yOffset}), {width}x{height}, localColorTableFlag: {localColorTableFlag}, interlaceFlag: {interlaceFlag}, sortFlag: {sortFlag}, localColorTableSize: {localColorTableSize}");
 #endif
 
             var imageSize = width * height;
@@ -428,7 +442,7 @@ namespace SS.UIComponent
                 }
                 
 #if UNITY_EDITOR
-                Debug.Log($"LocalColorTable Length: {localColorTable.Length}");
+                Log($"LocalColorTable Length: {localColorTable.Length}");
 #endif
             }
 
@@ -436,7 +450,7 @@ namespace SS.UIComponent
             var lzwMinCodeSize = bytes[byteIndex++];
             var lzwSize = 1 << lzwMinCodeSize;
 #if UNITY_EDITOR
-            Debug.Log($"LZW Size: {lzwSize}");
+            Log($"LZW Size: {lzwSize}");
 #endif
             var clearCode = lzwSize;
             
@@ -470,7 +484,7 @@ namespace SS.UIComponent
             var bitData = new BitArray(totalData.ToArray());
             var decodedBytes = DecodeImageBlockData(bitData, clearCode, lzwMinCodeSize, imageSize);
 #if UNITY_EDITOR
-            Debug.Log($"decoded bytes: {decodedBytes?.Length}");
+            Log($"decoded bytes: {decodedBytes?.Length}");
 #endif
 
             return new ImageBlock()
@@ -519,7 +533,7 @@ namespace SS.UIComponent
             InitTable();
             
 #if UNITY_EDITOR
-            Debug.Log($"[LZW Decode] Clear Code: {clearCode}, code size (lzw min code size + 1): {codeSize}");
+            Log($"[LZW Decode] Clear Code: {clearCode}, code size (lzw min code size + 1): {codeSize}");
 #endif
             
             while (bitIndex < imageData.Length)
@@ -532,7 +546,7 @@ namespace SS.UIComponent
                 if (value == clearCode)
                 {
 #if UNITY_EDITOR
-                    Debug.Log($"[LZW Decode] Code Table Reset With Clear Code, code table size: {codeTable.Count}, code size: {codeSize}");
+                    Log($"[LZW Decode] Code Table Reset With Clear Code, code table size: {codeTable.Count}, code size: {codeSize}");
 #endif
                     InitTable();
                     continue;
@@ -541,7 +555,7 @@ namespace SS.UIComponent
                 else if (value == endCode)
                 {
 #if UNITY_EDITOR
-                    Debug.Log($"[LZW Decode] Decode LZW End With:  clear code + 1");
+                    Log($"[LZW Decode] Decode LZW End With:  clear code + 1");
 #endif
                     break;
                 }
@@ -617,7 +631,6 @@ namespace SS.UIComponent
                     codeSize++;
                     maxTableSize = 1 << codeSize;
 #if UNITY_EDITOR
-                    Debug.Log($"[LZW Decode] Code Table Size Increase, code table size: {codeTable.Count}, code size: {codeSize}, next max table size: {maxTableSize}");
 #endif
                 }
 
@@ -789,18 +802,18 @@ namespace SS.UIComponent
 
             colors = tempColors;
 
-            // Set Pixels是从下到上的填充，这里需要颠倒一下
+            // SetPixels32 的原点在左下，而解码结果是从上到下排列的，翻转行序后一次性上传，
+            // 比逐像素 SetPixel 快一个数量级（帧多时尤其明显）
+            var textureColors = new Color32[imageSize];
             for (int i = 0; i < height; i++)
             {
-                for (int j = 0; j < width; j++)
-                {
-                    texture2D.SetPixel(j, height - i - 1, colors[i * width + j]);
-                }
+                Array.Copy(colors, i * width, textureColors, (height - i - 1) * width, width);
             }
 
-            texture2D.Apply();
+            texture2D.SetPixels32(textureColors);
+            texture2D.Apply(false, false);
 #if UNITY_EDITOR
-            Debug.Log($"Add frame, image block x: {imageBlock.XOffset}, y: {imageBlock.YOffset}, width: {imageBlock.Width}, height: {imageBlock.Height}, delay: {delayTime}");
+            Log($"Add frame, image block x: {imageBlock.XOffset}, y: {imageBlock.YOffset}, width: {imageBlock.Width}, height: {imageBlock.Height}, delay: {delayTime}");
 #endif
             return new GifData(delayTime, texture2D);
         }
@@ -853,7 +866,7 @@ namespace SS.UIComponent
             // 是否使用透明色（第8位）
             var transparentColorFlag = (flagByte & 0b00000001) != 0;
 #if UNITY_EDITOR
-            Debug.Log($"Graphic Control: flag byte: (Binary) {flagByte.ToBinaryString()}, executeMethod: {executeMethod}, expectUserInput: {expectUserInput}, transparentColorFlag: {transparentColorFlag}");
+            Log($"Graphic Control: flag byte: (Binary) {flagByte.ToBinaryString()}, executeMethod: {executeMethod}, expectUserInput: {expectUserInput}, transparentColorFlag: {transparentColorFlag}");
 #endif
             
             // 延迟时间，单位1/100 秒，如果值不为1，表示暂停规定的时间后再继续往下处理数据流
@@ -864,7 +877,7 @@ namespace SS.UIComponent
             // 块终结标识
             var endCode = bytes[byteIndex++];
 #if UNITY_EDITOR
-            Debug.Log($"graphic extension control block end");
+            Log($"graphic extension control block end");
 #endif
             return new GifGraphicExtensionBlock(executeMethod, transparentColorFlag, transparentColorIndex, delayTime);
         }
@@ -907,9 +920,10 @@ namespace SS.UIComponent
             }
             
 #if UNITY_EDITOR
-            Debug.Log($"plain text: {sb}");
+            Log($"plain text: {sb}");
 #endif
-            // TODO: 填充数据
+            // 纯文本扩展块是 GIF 文件内的元数据（常见于版权、作者、说明等信息），
+            // 它不是叠加在画面上的文字，因此只解析并保留内容，不参与渲染
             return new GifPlainTextExtensionBlock(sb.ToString(), width, height, leftEdge, topEdge, characterCellWidth, characterCellHeight, foregroundColorIndex, backgroundColorIndex);
         }
         

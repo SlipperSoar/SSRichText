@@ -4,6 +4,23 @@
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-10-20
+
+### Added
+
+- 图标与 GIF 名称支持 `Resources` 子目录：`<icon=Icons/heart/>` 对应 `Resources.Load<Sprite>("Icons/heart")`，`<gif=Gifs/cat/>` 对应 `Resources/Gifs/cat.bytes`；写反斜杠会自动转成正斜杠。
+- 新增英文文档 [README_EN.md](README_EN.md)，中英文 README 顶部可以互相切换。
+
+### Changed
+
+- GIF 帧上传从逐像素 `SetPixel` 改为一次性 `SetPixels32`，帧数多时解码速度明显提升。
+- 解码过程的详细日志默认关闭，可用 `GifDecoder.VerboseLog` 打开；`GIF Viewer` 加载改为在时间预算内批量推进解码，预览速度明显提升。
+- 文档修正：GIF 的纯文本扩展块（Plain Text Extension）是文件内的元数据（常见于版权、说明等），不是叠加在动图上的文字，也不是“未实现的渲染功能”。
+
+### Fixed
+
+- 修复 GIF Viewer 加载多帧动图过慢的问题。
+
 ## [2.1.0] - 2026-10-20
 
 ### Added
@@ -95,7 +112,8 @@
 
 - 首个版本：基于 Unity 原生 UI Text 的富文本组件。
 
-[Unreleased]: https://github.com/SlipperSoar/SSRichText/compare/v2.1.0...HEAD
+[Unreleased]: https://github.com/SlipperSoar/SSRichText/compare/v2.2.0...HEAD
+[2.2.0]: https://github.com/SlipperSoar/SSRichText/compare/v2.1.0...v2.2.0
 [2.1.0]: https://github.com/SlipperSoar/SSRichText/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/SlipperSoar/SSRichText/compare/v1.9.0...v2.0.0
 [1.9.0]: https://github.com/SlipperSoar/SSRichText/compare/v1.8.0...v1.9.0

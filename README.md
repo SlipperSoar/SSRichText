@@ -1,5 +1,7 @@
 # SSRichText
 
+[简体中文](README.md) | [English](README_EN.md)
+
 [![Release](https://img.shields.io/github/v/release/SlipperSoar/SSRichText?sort=semver&label=release)](https://github.com/SlipperSoar/SSRichText/releases/latest)
 [![License](https://img.shields.io/github/license/SlipperSoar/SSRichText)](LICENSE)
 [![Unity](https://img.shields.io/badge/Unity-2021.2%2B-black?logo=unity)](https://unity.com/)
@@ -43,7 +45,7 @@ https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText
 需要固定版本时在末尾追加 tag，例如：
 
 ```text
-https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText#v2.1.0
+https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText#v2.2.0
 ```
 
 也可以直接写进 `Packages/manifest.json`：
@@ -51,7 +53,7 @@ https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText#v2.1.0
 ```json
 {
   "dependencies": {
-    "com.github-slippersoar.ssrichtext": "https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText#v2.1.0"
+    "com.github-slippersoar.ssrichtext": "https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText#v2.2.0"
   }
 }
 ```
@@ -126,8 +128,8 @@ public class RichTextExample : MonoBehaviour
 | 下划线 | `<underline=red>text</underline>` | 必须带颜色参数 |
 | 渐变 | `<gradient lt=red rt=red lb=red rb=red>text</gradient>` | 需要给出四个角的颜色，可分别使用颜色名或十六进制 |
 | 链接 | `<link=www.unity.com>text</link>` | 支持 `https://` 等协议，也可省略协议头（自动补 `https://`） |
-| 图标 | `<icon=heart/>` | 默认从 `Resources` 读取 `Sprite`，可通过 `IIconProvider` 替换 |
-| 动图 | `<gif=cat/>` | 默认从 `Resources` 读取 `.bytes`，由 `GifLoadManager` 自动解码播放 |
+| 图标 | `<icon=Icons/heart/>` | 默认从 `Resources` 读取 `Sprite`（支持子目录），可通过 `IIconProvider` 替换 |
+| 动图 | `<gif=Gifs/cat/>` | 默认从 `Resources` 读取 `.bytes`（支持子目录），由 `GifLoadManager` 自动解码播放 |
 
 ### 颜色写法
 
@@ -189,15 +191,15 @@ RichText.GlobalIconProvider = new MyIconProvider();
 
 注意事项：
 
-- 图标名只支持字母、数字以及 `_`、`-`、`(`、`)`、`.`，不支持空格与目录分隔符，因此默认加载方式只能命中 `Resources` 根目录下的资源。
+- 图标名支持字母、数字以及 `_`、`-`、`(`、`)`、`.`、`/`，因此可以放在 `Resources` 的子目录里：`<icon=Icons/heart/>` 等价于 `Resources.Load<Sprite>("Icons/heart")`；写成 `Icons\heart` 也会自动转成 `/`。不支持空格，也不要写扩展名（写 `heart`，不要写 `heart.png`）。
 - 图标占一个字符位，尺寸随字号变化；找不到图标时，占位字符保持透明，不会显示乱码方块。
 - `<shadow>` 同样作用于图标，并支持四角方向。
 
 ## GIF 动图
 
 1. 把 `.gif` 文件拖进工程：`GifImporter` 会自动把它转换成同名 `.bytes`，并**删除原始 `.gif` 文件**（请先用版本管理提交备份）。
-2. 把 `.bytes` 直接放到某个 `Resources` 目录下（例如 `Assets/Resources/cat.bytes`）。标签名不支持目录分隔符，所以放在子目录里无法被默认加载器找到。
-3. 在文本中使用 `<gif=cat/>`。
+2. 把 `.bytes` 放到任意 `Resources` 目录下，可以继续分子目录。例如 `Assets/Resources/Gifs/cat.bytes` 对应 `<gif=Gifs/cat/>`，`Assets/Resources/cat.bytes` 对应 `<gif=cat/>`。
+3. 在文本中使用 `<gif=Gifs/cat/>`（路径相对 `Resources`，写成 `Gifs\cat` 也可以，不需要带 `.bytes` 扩展名）。
 
 运行时行为：
 
@@ -235,10 +237,12 @@ GifLoadManager.Instance.AddGifData(
 | `Window > SS > GIF Viewer` | 预览 `.gif` 或 `.bytes` 的解码结果、帧数与尺寸 |
 | 导入 `.gif` | 自动转换成 `.bytes`，方便 `Resources` 加载 |
 
+> 解码过程的详细日志默认关闭；排查问题时可以在代码里设置 `GifDecoder.VerboseLog = true` 打开。
+
 ## 已知限制
 
 - 仅支持 Legacy `Text`，不支持 TextMeshPro。
-- `<gif>` 内部的文本（例如把文字叠在动图上）不会参与渲染，这部分扩展块目前只占位。
+- GIF 文件里的纯文本扩展块（Plain Text Extension）不会被绘制到画面上。它是 GIF 内部的元数据，常见于版权、作者、说明等信息，并不是叠加在动图上的文字；本组件只解析和保留内容，不参与渲染。
 - 图标与动图各占一个字符位，超大图片会被压缩到该字符格内显示。
 - GIF 解码在协程中完成，超大 GIF 首次显示会有一定开销。
 - 关闭 `supportRichText` 会退化为原生 `Text` 的行为，扩展标签不再生效。
@@ -253,7 +257,8 @@ Assets/SSRichText/                 # 可独立分发的 UPM 包
   Editor/                          # GIF Viewer 与导入处理（独立 Editor 程序集）
 Assets/Scenes/SampleScene.unity    # 示例场景
 Assets/Scripts/Sample/             # 示例脚本
-Assets/Resources/                  # 示例用的图标与 GIF 数据
+Assets/Resources/Icons/            # 示例图标（演示 Resources 子目录加载）
+Assets/Resources/Gifs/             # 示例动图（演示 Resources 子目录加载）
 ```
 
 ## 更新日志与路线图
@@ -261,7 +266,6 @@ Assets/Resources/                  # 示例用的图标与 GIF 数据
 - 版本变更见 [CHANGELOG.md](CHANGELOG.md)
 - 维护者发布流程见 [RELEASING.md](RELEASING.md)
 - 已实现：描边、阴影、下划线、删除线、渐变、链接、图标、GIF、点击事件
-- 尚未实现：把 `<gif>` 内的文本渲染到动图帧上（扩展块不参与画面渲染）
 
 ## 致谢
 
@@ -273,14 +277,3 @@ Assets/Resources/                  # 示例用的图标与 GIF 数据
 ## 许可证
 
 [MIT](LICENSE)
-
----
-
-## English Summary
-
-**SSRichText** is a rich text component for Unity's legacy UGUI `Text`. It keeps the built-in `<b>`, `<i>`, `<size>` and `<color>` tags and adds `<outline>`, `<shadow>`, `<underline>`, `<s>`, `<gradient>`, `<link>`, `<icon>` and `<gif>`, plus a single `OnClick` event for every tag.
-
-- Requires Unity 2021.2+ and UGUI Legacy `Text` (not TextMeshPro).
-- Install via UPM: `https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText` (append `#v2.1.0` to pin a version), or download the `.unitypackage` from [Releases](https://github.com/SlipperSoar/SSRichText/releases/latest).
-- Icons and GIFs are resolved through `IIconProvider` / `IGifProvider`, both defaulting to `Resources`.
-- Licensed under the [MIT License](LICENSE). Full documentation (Chinese) is above.

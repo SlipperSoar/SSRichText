@@ -17,6 +17,9 @@ namespace SS.Editor
         private const string WindowTitle = "GIF Viewer";
         private const string LogPrefix = "[SSRichText]";
 
+        /// <summary>每次 Editor 更新最多用于推进解码的时间（秒），避免长时间阻塞编辑器</summary>
+        private const double LoadTimeBudgetSeconds = 0.01;
+
         private List<GifData> gifFrames;
         private string gifFilePath;
         private Texture2D gifFileTexture2D;
@@ -179,13 +182,19 @@ namespace SS.Editor
         /// </summary>
         private void OnEditorUpdate()
         {
-            if (gifDecoder != null && gifDecoder.MoveNext())
+            // 解码器每帧会 yield 多次，若一次 Editor 更新只 MoveNext 一步，帧数一多加载就会非常慢；
+            // 这里在时间预算内尽量多推进几步，既提速又不会长时间卡住编辑器
+            var startTime = EditorApplication.timeSinceStartup;
+            while (gifDecoder != null && EditorApplication.timeSinceStartup - startTime < LoadTimeBudgetSeconds)
             {
-                Repaint();
-                return;
+                if (!gifDecoder.MoveNext())
+                {
+                    EditorApplication.update -= OnEditorUpdate;
+                    break;
+                }
             }
 
-            EditorApplication.update -= OnEditorUpdate;
+            Repaint();
         }
 
         private void LoadGifFile(string gifPath, bool isBytesAsset)
