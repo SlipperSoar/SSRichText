@@ -20,7 +20,7 @@
 https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText
 ```
 
-需要固定版本时追加 tag，例如 `#v2.5.0`。
+需要固定版本时追加 tag，例如 `#v2.6.0`。
 
 ## 使用
 
@@ -77,7 +77,7 @@ public event Action<RichText.RichType, string> OnClick;
 ## 图标与动图
 
 - 图标：`<icon=heart/>` 默认从 `Resources` 读取同名 `Sprite`，支持子目录（`<icon=Icons/heart/>`）；实现 `IIconProvider` 后可通过 `richText.SetIconProvider(provider)` 或 `RichText.GlobalIconProvider` 替换加载逻辑。
-- 动图：导入 `.gif` 时会自动转成 `.bytes`；`<gif=Gifs/cat/>` 默认从 `Resources` 读取（支持子目录）；运行时由 `GifLoadManager`（自动创建、`DontDestroyOnLoad`）解析与播放，也可通过 `IGifProvider`、`AddGifData` 接入自定义来源。
+- 动图：导入 `.gif` 时会自动转成 `.bytes`；`<gif=Gifs/cat/>` 默认从 `Resources` 读取（支持子目录）；运行时由 `GifLoadManager`（自动创建、`DontDestroyOnLoad`）在后台线程解码、主线程创建纹理并播放（WebGL 自动退回主线程），也可通过 `IGifProvider`、`AddGifData` 接入自定义来源。
 
 ## 许可证
 

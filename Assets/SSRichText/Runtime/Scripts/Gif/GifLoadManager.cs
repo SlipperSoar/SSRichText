@@ -109,6 +109,7 @@ namespace SS.UIComponent
         private Queue<(string gifName, bool forceBgColorTransparent)> waitingQueue = new Queue<(string, bool)>();
         private Coroutine queueChecker;
         private readonly List<string> removeList = new List<string>();
+        private readonly List<IEnumerator> loadingDecoders = new List<IEnumerator>();
 
         #endregion
 
@@ -165,6 +166,17 @@ namespace SS.UIComponent
 
         private void OnDestroy()
         {
+            // 停止仍在解码的协程，触发迭代器 finally 通知后台线程退出
+            foreach (var decoder in loadingDecoders)
+            {
+                if (decoder is IDisposable disposable)
+                {
+                    disposable.Dispose();
+                }
+            }
+
+            loadingDecoders.Clear();
+
             foreach (var gifData in gifDatas.Values)
             {
                 ReleaseGifData(gifData);
@@ -358,13 +370,17 @@ namespace SS.UIComponent
             var gifSize = GifDecoder.GetGifSize(bytes);
             gifSizes.TryAddToDictionary(gifName, gifSize);
                 
-            StartCoroutine(GifDecoder.Decode(bytes, gifData =>
+            IEnumerator decoder = null;
+            decoder = GifDecoder.Decode(bytes, gifData =>
             {
                 gifLoadStatus[gifName] = true;
                 var loadData = gifDatas[gifName];
                 loadData.Data = gifData;
                 loadingCount--;
-            }, forceBgColorTransparent: forceBgColorTransparent));
+                loadingDecoders.Remove(decoder);
+            }, forceBgColorTransparent: forceBgColorTransparent);
+            loadingDecoders.Add(decoder);
+            StartCoroutine(decoder);
         }
 
         private IEnumerator CheckLoadingQueue()

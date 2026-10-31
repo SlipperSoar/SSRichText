@@ -45,7 +45,7 @@ https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText
 To pin a version, append a tag:
 
 ```text
-https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText#v2.5.0
+https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText#v2.6.0
 ```
 
 Or add it to `Packages/manifest.json` directly:
@@ -53,7 +53,7 @@ Or add it to `Packages/manifest.json` directly:
 ```json
 {
   "dependencies": {
-    "com.github-slippersoar.ssrichtext": "https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText#v2.5.0"
+    "com.github-slippersoar.ssrichtext": "https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText#v2.6.0"
   }
 }
 ```
@@ -203,7 +203,8 @@ Notes:
 
 Runtime behavior:
 
-- On first use a `GifLoadManager` is created automatically (`DontDestroyOnLoad`), decodes the bytes in a coroutine and plays frames in one place.
+- On first use a `GifLoadManager` is created automatically (`DontDestroyOnLoad`); bytes are decoded on a background thread, the main thread only creates textures, and frames are played in one place.
+- Decoding runs on a background thread by default. Platforms without thread support (WebGL) fall back to the main thread automatically; set `GifDecoder.UseBackgroundThread = false` to force the main-thread path.
 - GIF data that has not been used for 120 seconds is released (adjust with `GifLoadManager.UnloadCountDownSeconds`); pass `dontClear: true` to keep it resident. The number of concurrent decodes can be changed with `GifLoadManager.MaxConcurrentLoads` (default 2).
 - Custom byte sources: implement `IGifProvider.GetGifBytes(string gifName)` and assign it to `GifLoadManager.Instance.GifProvider`.
 - Frame sequences can also be injected directly with `AddGifData`:
@@ -244,7 +245,7 @@ GifLoadManager.Instance.AddGifData(
 - Legacy `Text` only; TextMeshPro is not supported.
 - Plain Text Extension blocks inside a GIF file are never drawn. They are metadata stored in the file (commonly copyright, author or description text), not text overlaid on the animation; the package parses and keeps them but does not render them.
 - Icons and GIFs occupy one character cell each; oversized images are squeezed into that cell.
-- GIF decoding runs in a coroutine, so very large GIFs have a noticeable first-display cost.
+- GIF decoding runs on a background thread by default and only texture uploads happen on the main thread; on platforms that fall back to the main thread (WebGL), very large GIFs block longer on first display.
 - Disabling `supportRichText` falls back to the native `Text` behavior and all extended tags stop working.
 
 ## Project structure

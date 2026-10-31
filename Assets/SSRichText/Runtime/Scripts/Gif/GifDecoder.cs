@@ -7,8 +7,11 @@
 
 using System;
 using System.Collections;
+using System.Collections.Concurrent;
 using System.Text;
 using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 using UnityEngine;
 
 namespace SS.UIComponent
@@ -207,6 +210,19 @@ namespace SS.UIComponent
             }
         }
 
+        /// <summary>
+        /// 是否在后台线程解码。默认开启；WebGL 等不支持线程的平台上会自动退回主线程。
+        /// </summary>
+        public static bool UseBackgroundThread = true;
+
+        private sealed class DecodedFrame
+        {
+            public int Width;
+            public int Height;
+            public Color32[] Colors;
+            public float Delay;
+        }
+
         #region enum
 
         /// <summary>
@@ -318,6 +334,106 @@ namespace SS.UIComponent
                 frames = new List<GifData>();
             }
 
+            // 不支持线程的平台（以及调用方显式关闭）走主线程路径
+            if (!UseBackgroundThread || Application.platform == RuntimePlatform.WebGLPlayer)
+            {
+                // 手动驱动内部迭代器：既能在 Unity 协程里工作，也能被 GIF Viewer 手动 MoveNext
+                var mainDecode = DecodeOnMainThread(bytes, frames, forceBgColorTransparent);
+                while (mainDecode.MoveNext())
+                {
+                    yield return mainDecode.Current;
+                }
+
+                onComplete?.Invoke(frames);
+                yield break;
+            }
+
+            var queue = new BlockingCollection<DecodedFrame>(2);
+            var cancellation = new CancellationTokenSource();
+            Exception workerError = null;
+
+            Task.Run(() =>
+            {
+                try
+                {
+                    DecodeAll(bytes, forceBgColorTransparent, frame => queue.Add(frame, cancellation.Token), cancellation.Token);
+                }
+                catch (OperationCanceledException)
+                {
+                }
+                catch (Exception exception)
+                {
+                    workerError = exception;
+                }
+                finally
+                {
+                    queue.CompleteAdding();
+                }
+            });
+
+            var uploadBuffer = new Color32[0];
+            var uploadStart = Time.realtimeSinceStartup;
+            try
+            {
+                while (true)
+                {
+                    DecodedFrame decoded;
+                    if (queue.TryTake(out decoded))
+                    {
+                        frames.Add(CreateGifData(decoded, ref uploadBuffer));
+                        if (Time.realtimeSinceStartup - uploadStart >= 0.008f)
+                        {
+                            uploadStart = Time.realtimeSinceStartup;
+                            yield return null;
+                        }
+
+                        continue;
+                    }
+
+                    if (queue.IsCompleted)
+                    {
+                        break;
+                    }
+
+                    yield return null;
+                }
+            }
+            finally
+            {
+                // 迭代器被 Dispose（调用方取消）时通知后台线程退出
+                cancellation.Cancel();
+            }
+
+            if (workerError != null)
+            {
+                Debug.LogError($"GIF decode failed: {workerError}");
+            }
+
+            cancellation.Dispose();
+            onComplete?.Invoke(frames);
+        }
+
+        private static IEnumerator DecodeOnMainThread(byte[] bytes, List<GifData> frames, bool forceBgColorTransparent)
+        {
+            // WebGL 等不能起线程的平台：先完整解码，再逐帧创建纹理。
+            // 这条路径会额外占用解码像素内存，但保证功能可用。
+            var decodedFrames = new List<DecodedFrame>();
+            DecodeAll(bytes, forceBgColorTransparent, decodedFrames.Add, CancellationToken.None);
+
+            var uploadBuffer = new Color32[0];
+            foreach (var decoded in decodedFrames)
+            {
+                frames.Add(CreateGifData(decoded, ref uploadBuffer));
+                yield return null;
+            }
+        }
+
+        /// <summary>
+        /// 在后台线程完成 GIF 结构解析、LZW 解码和像素合成，只产出纯数据，不触碰 Unity 纹理 API
+        /// </summary>
+        private static void DecodeAll(byte[] bytes, bool forceBgColorTransparent,
+            Action<DecodedFrame> onFrame, CancellationToken cancellationToken)
+        {
             var byteIndex = 0;
             // Header
             var sb = new StringBuilder();
@@ -325,7 +441,7 @@ namespace SS.UIComponent
             {
                 sb.Append((char)bytes[byteIndex]);
             }
-            
+
             // Header一定是GIF
             var header = sb.ToString();
             if (header[0] != 'G' || header[1] != 'I' || header[2] != 'F')
@@ -333,43 +449,30 @@ namespace SS.UIComponent
 #if UNITY_EDITOR
                 Debug.LogError($"This is not a GIF!");
 #endif
-                yield break;
+                return;
             }
 
-            // 版本：87a或89a
-            // var version = header.Substring(3, 3);
 #if UNITY_EDITOR
             Log($"Header: {header}");
 #endif
-            
+
             // 逻辑屏幕标识符
-            // 2字节的宽度信息
             var screenWidth = BitConverter.ToUInt16(bytes, byteIndex);
             byteIndex += 2;
-            // 2字节的高度信息
             var screenHeight = BitConverter.ToUInt16(bytes, byteIndex);
             byteIndex += 2;
-            // 一字节的四个数据标志
             var flagByte = bytes[byteIndex++];
-            // 第一位：是否存在全局颜色表
             var globalColorTableFlag = (flagByte & 0b10000000) != 0;
-            // 第2-4位：颜色深度
             var colorResolution = (flagByte & 0b01110000) >> 4 + 1;
-            // 第5位：是否排序
             var sortFlag = (flagByte & 0b00001000) != 0;
-            // 第6-8位：全局颜色表大小
             var globalColorTableSize = 2 << (flagByte & 0b00000111);
-            // 背景色
             var backgroundColorIndex = bytes[byteIndex++];
-            // 像素宽高比
             var pixelAspectRatio = bytes[byteIndex++];
 #if UNITY_EDITOR
             Log($"Screen: {screenWidth}x{screenHeight} flag byte: {flagByte}, globalColorTableFlag: {globalColorTableFlag}, colorResolution: {colorResolution}, sortFlag: {sortFlag}, globalColorTableSize: {globalColorTableSize}, backgroundColorIndex: {backgroundColorIndex}, pixelAspectRatio: {pixelAspectRatio}");
 #endif
-            
-            // 当全局颜色表不存在时，背景色用Clear色（无色）
+
             var bgColor = new Color32(0, 0, 0, 0);
-            // 全局颜色表
             Color32[] globalColorTable = null;
             if (globalColorTableFlag)
             {
@@ -392,19 +495,17 @@ namespace SS.UIComponent
 #endif
             }
 
-            yield return null;
-            
-            // 图像块标识符
             IGifExtensionBlock extensionBlock = null;
             Color32[] prevColors = null;
             var screenSize = screenWidth * screenHeight;
-            // 复用的临时缓冲，避免每帧分配大数组和 LZW 表
-            var uploadBuffer = new Color32[screenSize];
             var lzwPrefix = new int[MAX_CODE_TABLE_SIZE];
             var lzwSuffix = new byte[MAX_CODE_TABLE_SIZE];
             var lzwStack = new byte[MAX_CODE_TABLE_SIZE];
+
             while (bytes[byteIndex] != GIF_END_SIGNATURE)
             {
+                cancellationToken.ThrowIfCancellationRequested();
+
                 var blockFlag = bytes[byteIndex++];
                 if (blockFlag == GIF_SIGNATURE)
                 {
@@ -414,26 +515,24 @@ namespace SS.UIComponent
 #if UNITY_EDITOR
                         Log($"Decode interlace data");
 #endif
-                        imageBlock.ImageData= ProcessInterlaceData(imageBlock, screenWidth, screenHeight);
-                    }
-                    
-                    yield return null;
-                    
-                    var texture = new Texture2D(screenWidth, screenHeight, TextureFormat.ARGB32, false);
-                    var usingColorTable = imageBlock.LocalColorTable ?? globalColorTable;
-                    if (usingColorTable == null)
-                    {
-                        // TODO: 使用系统颜色表
+                        imageBlock.ImageData = ProcessInterlaceData(imageBlock, screenWidth, screenHeight);
                     }
 
-                    var frame = ProcessTexturePixels(texture, imageBlock, bgColor, extensionBlock as GifGraphicExtensionBlock,
-                        usingColorTable, prevColors, uploadBuffer, out var colors);
-                    frames.Add(frame);
-                    yield return null;
+                    var usingColorTable = imageBlock.LocalColorTable ?? globalColorTable;
+                    var colors = ComputeFramePixels(screenWidth, screenHeight, imageBlock, bgColor,
+                        extensionBlock as GifGraphicExtensionBlock, usingColorTable, prevColors, out var delay);
+
+                    onFrame(new DecodedFrame
+                    {
+                        Width = screenWidth,
+                        Height = screenHeight,
+                        Colors = colors,
+                        Delay = delay,
+                    });
 
                     prevColors = colors;
                 }
-                else if (blockFlag == GIF_Extension_BLOCK_FLAG) // 扩展块，会影响接下来一个图像数据块
+                else if (blockFlag == GIF_Extension_BLOCK_FLAG)
                 {
                     extensionBlock = ReadExtensionBlock(bytes, ref byteIndex);
                 }
@@ -444,10 +543,32 @@ namespace SS.UIComponent
 #endif
                 }
             }
-            
-            onComplete?.Invoke(frames);
         }
 
+        /// <summary>
+        /// 把后台解码出来的像素上传成纹理（必须在主线程调用）
+        /// </summary>
+        private static GifData CreateGifData(DecodedFrame decoded, ref Color32[] uploadBuffer)
+        {
+            var width = decoded.Width;
+            var height = decoded.Height;
+            var imageSize = width * height;
+            if (uploadBuffer == null || uploadBuffer.Length != imageSize)
+            {
+                uploadBuffer = new Color32[imageSize];
+            }
+
+            for (var i = 0; i < height; i++)
+            {
+                Array.Copy(decoded.Colors, i * width, uploadBuffer, (height - i - 1) * width, width);
+            }
+
+            var texture = new Texture2D(width, height, TextureFormat.ARGB32, false);
+            texture.SetPixels32(uploadBuffer);
+            texture.Apply(false, false);
+            decoded.Colors = null;
+            return new GifData(decoded.Delay, texture);
+        }
         #region Private Methods
 
         private static ImageBlock ReadImageDataBlock(byte[] bytes, int screenSize, ref int byteIndex,
@@ -746,15 +867,13 @@ namespace SS.UIComponent
             return newBytes;
         }
 
-        private static GifData ProcessTexturePixels(Texture2D texture2D, ImageBlock imageBlock, Color32 bgColor,
+        private static Color32[] ComputeFramePixels(int width, int height, ImageBlock imageBlock, Color32 bgColor,
             GifGraphicExtensionBlock graphicExtensionBlock, Color32[] colorTable, Color32[] prevColors,
-            Color32[] uploadBuffer, out Color32[] colors)
+            out float delayTime)
         {
-            var width = texture2D.width;
-            var height = texture2D.height;
             var imageSize = width * height;
             var tempColors = new Color32[imageSize];
-            var delayTime = 0f;
+            delayTime = 0f;
 
             void FillTexture(bool lerp = false)
             {
@@ -811,7 +930,10 @@ namespace SS.UIComponent
                     case GraphicExecuteMethod.DoNotDispose:
                     {
                         if (prevColors != null)
-                            tempColors = prevColors;
+                        {
+                            // 上一帧可能已经交给主线程上传，必须复制后再修改
+                            tempColors = (Color32[])prevColors.Clone();
+                        }
                         else
                         {
 #if UNITY_EDITOR
@@ -839,7 +961,7 @@ namespace SS.UIComponent
                             break;
                         }
                 
-                        tempColors = prevColors;
+                        tempColors = (Color32[])prevColors.Clone();
                     }
                         break;
                 }
@@ -847,27 +969,10 @@ namespace SS.UIComponent
                 delayTime = graphicExtensionBlock.DelayTime / 100f;
             }
 
-            colors = tempColors;
-
-            // SetPixels32 的原点在左下，而解码结果是从上到下排列的，翻转行序后一次性上传，
-            // 比逐像素 SetPixel 快一个数量级（帧多时尤其明显）
-            if (uploadBuffer == null || uploadBuffer.Length != imageSize)
-            {
-                uploadBuffer = new Color32[imageSize];
-            }
-
-            var textureColors = uploadBuffer;
-            for (int i = 0; i < height; i++)
-            {
-                Array.Copy(colors, i * width, textureColors, (height - i - 1) * width, width);
-            }
-
-            texture2D.SetPixels32(textureColors);
-            texture2D.Apply(false, false);
 #if UNITY_EDITOR
             Log($"Add frame, image block x: {imageBlock.XOffset}, y: {imageBlock.YOffset}, width: {imageBlock.Width}, height: {imageBlock.Height}, delay: {delayTime}");
 #endif
-            return new GifData(delayTime, texture2D);
+            return tempColors;
         }
 
         #region Extension Block

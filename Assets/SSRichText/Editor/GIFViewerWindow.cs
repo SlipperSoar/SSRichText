@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
@@ -319,6 +320,12 @@ namespace SS.Editor
             if (!isLoading)
             {
                 return;
+            }
+
+            if (gifDecoder is IDisposable disposable)
+            {
+                // 触发迭代器的 finally，通知后台解码线程退出
+                disposable.Dispose();
             }
 
             gifDecoder = null;

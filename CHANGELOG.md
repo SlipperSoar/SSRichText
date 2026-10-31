@@ -4,6 +4,21 @@
 
 ## [Unreleased]
 
+## [2.6.0] - 2026-10-31
+
+### Added
+
+- GIF 解码改为后台线程执行：GIF 结构解析、LZW 和像素合成在 worker 上完成，主线程只创建纹理并上传；WebGL 等不支持线程的平台自动退回主线程。
+- 新增 `GifDecoder.UseBackgroundThread`，可以显式关闭后台解码。
+
+### Fixed
+
+- 修复 GIF disposal 模式（`DoNotDispose` / `RecoveryToPrev`）复用上一帧像素数组时，后台线程与主线程上传之间的数据竞争。
+
+### Changed
+
+- `GifLoadManager` 跟踪正在解码的协程，销毁时取消后台任务；GIF Viewer 停止加载时也会 Dispose 解码迭代器。
+
 ## [2.5.0] - 2026-10-31
 
 ### Changed
@@ -151,7 +166,8 @@
 
 - 首个版本：基于 Unity 原生 UI Text 的富文本组件。
 
-[Unreleased]: https://github.com/SlipperSoar/SSRichText/compare/v2.5.0...HEAD
+[Unreleased]: https://github.com/SlipperSoar/SSRichText/compare/v2.6.0...HEAD
+[2.6.0]: https://github.com/SlipperSoar/SSRichText/compare/v2.5.0...v2.6.0
 [2.5.0]: https://github.com/SlipperSoar/SSRichText/compare/v2.4.0...v2.5.0
 [2.4.0]: https://github.com/SlipperSoar/SSRichText/compare/v2.3.1...v2.4.0
 [2.3.1]: https://github.com/SlipperSoar/SSRichText/compare/v2.3.0...v2.3.1

@@ -45,7 +45,7 @@ https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText
 需要固定版本时在末尾追加 tag，例如：
 
 ```text
-https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText#v2.5.0
+https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText#v2.6.0
 ```
 
 也可以直接写进 `Packages/manifest.json`：
@@ -53,7 +53,7 @@ https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText#v2.5.0
 ```json
 {
   "dependencies": {
-    "com.github-slippersoar.ssrichtext": "https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText#v2.5.0"
+    "com.github-slippersoar.ssrichtext": "https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText#v2.6.0"
   }
 }
 ```
@@ -203,7 +203,8 @@ RichText.GlobalIconProvider = new MyIconProvider();
 
 运行时行为：
 
-- 首次渲染时自动创建 `GifLoadManager`（`DontDestroyOnLoad`），在后台协程里解析字节数据并按帧延迟统一播放。
+- 首次渲染时自动创建 `GifLoadManager`（`DontDestroyOnLoad`），在后台线程解码字节数据，主线程只负责创建纹理，并按帧延迟统一播放。
+- 解码默认在后台线程完成；WebGL 等不支持线程的平台会自动退回主线程，也可以用 `GifDecoder.UseBackgroundThread = false` 强制关闭。
 - 默认 120 秒未被使用的 GIF 数据会自动卸载（可用 `GifLoadManager.UnloadCountDownSeconds` 调整），需要常驻时可以传 `dontClear: true`；同时解码的数量上限可用 `GifLoadManager.MaxConcurrentLoads` 调整（默认 2）。
 - 自定义加载来源：实现 `IGifProvider.GetGifBytes(string gifName)` 并赋给 `GifLoadManager.Instance.GifProvider`。
 - 直接塞入帧动画（不经过 GIF 解析）也可以用 `AddGifData`。
@@ -244,7 +245,7 @@ GifLoadManager.Instance.AddGifData(
 - 仅支持 Legacy `Text`，不支持 TextMeshPro。
 - GIF 文件里的纯文本扩展块（Plain Text Extension）不会被绘制到画面上。它是 GIF 内部的元数据，常见于版权、作者、说明等信息，并不是叠加在动图上的文字；本组件只解析和保留内容，不参与渲染。
 - 图标与动图各占一个字符位，超大图片会被压缩到该字符格内显示。
-- GIF 解码在协程中完成，超大 GIF 首次显示会有一定开销。
+- GIF 解码默认在后台线程完成，主线程只上传纹理；WebGL 等平台退回主线程时，超大 GIF 首次显示会阻塞更久。
 - 关闭 `supportRichText` 会退化为原生 `Text` 的行为，扩展标签不再生效。
 
 ## 目录结构
