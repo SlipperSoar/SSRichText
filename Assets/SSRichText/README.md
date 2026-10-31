@@ -8,7 +8,7 @@
 
 ## 环境要求
 
-- Unity 2021.2 及以上（代码使用 C# 9 语法；2021.3.27f1 实测）
+- Unity 2020.3 及以上（C# 8；2021.3.27f1 实测，2020.3 编译级校验）
 - UGUI（`com.unity.ugui`）的 Legacy `Text`
 - 无其它运行时依赖
 
@@ -20,7 +20,7 @@
 https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText
 ```
 
-需要固定版本时追加 tag，例如 `#v2.4.0`。
+需要固定版本时追加 tag，例如 `#v2.5.0`。
 
 ## 使用
 

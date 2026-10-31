@@ -4,6 +4,13 @@
 
 ## [Unreleased]
 
+## [2.5.0] - 2026-10-31
+
+### Changed
+
+- 最低支持 Unity 版本降到 2020.3：把 3 处 `is not` 和 2 处目标类型 `new()` 改写为 C# 8 语法，`package.json` 的 `unity` 同步改为 `2020.3`。
+- 2020.3 使用 C# 8 编译级校验通过；运行时仍在 2021.3.27f1 上验证。
+
 ## [2.4.0] - 2026-10-20
 
 ### Changed
@@ -144,7 +151,8 @@
 
 - 首个版本：基于 Unity 原生 UI Text 的富文本组件。
 
-[Unreleased]: https://github.com/SlipperSoar/SSRichText/compare/v2.4.0...HEAD
+[Unreleased]: https://github.com/SlipperSoar/SSRichText/compare/v2.5.0...HEAD
+[2.5.0]: https://github.com/SlipperSoar/SSRichText/compare/v2.4.0...v2.5.0
 [2.4.0]: https://github.com/SlipperSoar/SSRichText/compare/v2.3.1...v2.4.0
 [2.3.1]: https://github.com/SlipperSoar/SSRichText/compare/v2.3.0...v2.3.1
 [2.3.0]: https://github.com/SlipperSoar/SSRichText/compare/v2.2.0...v2.3.0

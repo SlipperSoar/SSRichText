@@ -29,7 +29,7 @@ namespace SS.UIComponent
                 return;
             }
 
-            if (richInfo is not ShadowRichInfo shadowRichInfo)
+            if (!(richInfo is ShadowRichInfo shadowRichInfo))
             {
                 Debug.LogError("richInfo is not ShadowRichInfo");
                 return;
@@ -253,7 +253,7 @@ namespace SS.UIComponent
         {
             var result = new List<UIVertex[]>();
             // 转换为划线专用的类型
-            if (richInfo is not DrawingLineRichInfo lineRichInfo)
+            if (!(richInfo is DrawingLineRichInfo lineRichInfo))
             {
                 Debug.LogError($"Cant Cast to DrawingLineRichInfo: {richInfo}");
                 return result;
@@ -341,7 +341,7 @@ namespace SS.UIComponent
             }
             
             // 转换为渐变专用的类型
-            if (richInfo is not GradientRichInfo gradientRichInfo)
+            if (!(richInfo is GradientRichInfo gradientRichInfo))
             {
                 Debug.LogError($"Cant Cast to GradientRichInfo: {richInfo}");
                 return;

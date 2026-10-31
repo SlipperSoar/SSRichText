@@ -4,7 +4,7 @@
 
 [![Release](https://img.shields.io/github/v/release/SlipperSoar/SSRichText?sort=semver&label=release)](https://github.com/SlipperSoar/SSRichText/releases/latest)
 [![License](https://img.shields.io/github/license/SlipperSoar/SSRichText)](LICENSE)
-[![Unity](https://img.shields.io/badge/Unity-2021.2%2B-black?logo=unity)](https://unity.com/)
+[![Unity](https://img.shields.io/badge/Unity-2020.3%2B-black?logo=unity)](https://unity.com/)
 [![Stars](https://img.shields.io/github/stars/SlipperSoar/SSRichText?style=flat)](https://github.com/SlipperSoar/SSRichText/stargazers)
 
 基于 Unity 旧版 UI Text（UGUI Legacy Text）的富文本组件。在原生 `<b>`、`<i>`、`<size>`、`<color>` 之外，额外支持**描边、阴影、下划线、删除线、渐变、链接、内联图标与 GIF 动图**，并提供统一的点击回调。
@@ -26,7 +26,7 @@
 
 | 项目 | 说明 |
 | --- | --- |
-| Unity | 2021.2 及以上（代码使用 C# 9 语法；在 2021.3.27f1 上实测） |
+| Unity | 2020.3 及以上（C# 8；2021.3.27f1 实测，2020.3 做编译级校验） |
 | UI 系统 | UGUI（`com.unity.ugui`）的 Legacy `Text` |
 | 其它依赖 | 无。运行时不需要额外包，也不依赖 TextMeshPro |
 
@@ -45,7 +45,7 @@ https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText
 需要固定版本时在末尾追加 tag，例如：
 
 ```text
-https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText#v2.4.0
+https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText#v2.5.0
 ```
 
 也可以直接写进 `Packages/manifest.json`：
@@ -53,7 +53,7 @@ https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText#v2.4.0
 ```json
 {
   "dependencies": {
-    "com.github-slippersoar.ssrichtext": "https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText#v2.4.0"
+    "com.github-slippersoar.ssrichtext": "https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText#v2.5.0"
   }
 }
 ```
@@ -246,7 +246,6 @@ GifLoadManager.Instance.AddGifData(
 - 图标与动图各占一个字符位，超大图片会被压缩到该字符格内显示。
 - GIF 解码在协程中完成，超大 GIF 首次显示会有一定开销。
 - 关闭 `supportRichText` 会退化为原生 `Text` 的行为，扩展标签不再生效。
-- 代码中用到了 C# 9 的 `is not` 模式（3 处）与目标类型 `new()`（2 处），所以 Unity 2020.3 LTS（C# 8）无法直接编译；如需支持 2020.3，把这 5 处语法改写为 C# 8 写法即可。
 
 ## 目录结构
 

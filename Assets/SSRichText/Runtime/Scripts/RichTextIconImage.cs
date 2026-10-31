@@ -435,8 +435,8 @@ namespace SS.UIComponent
         private (int width, int height) CalcOffsetForCombine(Dictionary<string, Sprite> icons, out Dictionary<string, Vector4> iconOffsetSizes, out Dictionary<string, Vector4> gifOffsetSizes)
         {
             // 主要是担心icon和gif会存在重名，所以分开处理
-            iconOffsetSizes = new(icons.Count);
-            gifOffsetSizes = new(_gifs.Count);
+            iconOffsetSizes = new Dictionary<string, Vector4>(icons.Count);
+            gifOffsetSizes = new Dictionary<string, Vector4>(_gifs.Count);
 
             if (icons.Count == 0 && _gifs.Count == 0)
             {

@@ -4,7 +4,7 @@
 
 [![Release](https://img.shields.io/github/v/release/SlipperSoar/SSRichText?sort=semver&label=release)](https://github.com/SlipperSoar/SSRichText/releases/latest)
 [![License](https://img.shields.io/github/license/SlipperSoar/SSRichText)](LICENSE)
-[![Unity](https://img.shields.io/badge/Unity-2021.2%2B-black?logo=unity)](https://unity.com/)
+[![Unity](https://img.shields.io/badge/Unity-2020.3%2B-black?logo=unity)](https://unity.com/)
 [![Stars](https://img.shields.io/github/stars/SlipperSoar/SSRichText?style=flat)](https://github.com/SlipperSoar/SSRichText/stargazers)
 
 A rich text component for Unity's legacy UGUI `Text`. On top of the built-in `<b>`, `<i>`, `<size>` and `<color>` tags it adds **outline, shadow, underline, strikethrough, gradient, link, inline icons and GIF animations**, plus a single click event for all of them.
@@ -26,7 +26,7 @@ A rich text component for Unity's legacy UGUI `Text`. On top of the built-in `<b
 
 | Item | Requirement |
 | --- | --- |
-| Unity | 2021.2 or newer (C# 9 is required; tested with 2021.3.27f1) |
+| Unity | 2020.3 or newer (C# 8; tested with 2021.3.27f1, 2020.3 is compile-checked) |
 | UI system | UGUI (`com.unity.ugui`) legacy `Text` |
 | Other dependencies | None at runtime, and no TextMeshPro dependency |
 
@@ -45,7 +45,7 @@ https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText
 To pin a version, append a tag:
 
 ```text
-https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText#v2.4.0
+https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText#v2.5.0
 ```
 
 Or add it to `Packages/manifest.json` directly:
@@ -53,7 +53,7 @@ Or add it to `Packages/manifest.json` directly:
 ```json
 {
   "dependencies": {
-    "com.github-slippersoar.ssrichtext": "https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText#v2.4.0"
+    "com.github-slippersoar.ssrichtext": "https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText#v2.5.0"
   }
 }
 ```
@@ -246,7 +246,6 @@ GifLoadManager.Instance.AddGifData(
 - Icons and GIFs occupy one character cell each; oversized images are squeezed into that cell.
 - GIF decoding runs in a coroutine, so very large GIFs have a noticeable first-display cost.
 - Disabling `supportRichText` falls back to the native `Text` behavior and all extended tags stop working.
-- The code uses C# 9 (`is not` patterns in 3 places, target-typed `new()` in 2 places), so Unity 2020.3 LTS (C# 8) cannot compile it as-is. Rewriting those 5 expressions in C# 8 syntax restores 2020.3 support.
 
 ## Project structure
 
