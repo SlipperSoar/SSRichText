@@ -1,0 +1,80 @@
+Shader "Custom/TextureCombineReplace"
+{
+    // 与 TextureCombineVert 相同，但关闭混合：
+    // 用于把 GIF 帧“覆盖”写进图集子区域，避免半透明帧与上一帧叠加出残影。
+    Properties
+    {
+        _MainTex ("Texture", 2D) = "white" {}
+        _StencilComp ("Stencil Comparison", Float) = 8
+	    _Stencil ("Stencil ID", Float) = 0
+	    _StencilOp ("Stencil Operation", Float) = 0
+	    _StencilWriteMask ("Stencil Write Mask", Float) = 255
+	    _StencilReadMask ("Stencil Read Mask", Float) = 255
+	    _ColorMask ("Color Mask", Float) = 15
+
+        _OffsetScale ("OffsetScale", Vector) = (0,0,1,1)
+        _SrcScale ("Src Scale", Vector) = (1,1,0,0)
+        _SrcOffset ("Src Offset", Vector) = (0,0,0,0)
+    }
+    SubShader
+    {
+        Tags { "RenderType"="Transparent" }
+
+        Pass
+        {
+            ZWrite Off
+            Lighting Off
+            Cull Off
+            ZTest [unity_GUIZTestMode]
+            Blend Off
+
+            CGPROGRAM
+            #pragma vertex vert
+            #pragma fragment frag
+            #pragma multi_compile _ UNITY_UI_ALPHACLIP
+
+            #include "UnityCG.cginc"
+
+            struct appdata
+            {
+                float4 vertex : POSITION;
+                float4 color : COLOR;
+                float2 texcoord : TEXCOORD0;
+                UNITY_VERTEX_INPUT_INSTANCE_ID
+            };
+
+            struct v2f
+            {
+                float4 vertex : SV_POSITION;
+                float2 texcoord : TEXCOORD0;
+                UNITY_VERTEX_OUTPUT_STEREO
+            };
+
+            sampler2D _MainTex;
+            float4 _MainTex_ST;
+            float4 _OffsetScale;
+            float4 _SrcScale;
+            float4 _SrcOffset;
+
+            v2f vert (appdata v)
+            {
+                v2f o;
+                UNITY_SETUP_INSTANCE_ID(v);
+                UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(o);
+
+                o.texcoord = v.texcoord * _SrcScale.xy + _SrcOffset.xy;
+
+                v.vertex.x = v.vertex.x * _OffsetScale.z + _OffsetScale.x;
+                v.vertex.y = v.vertex.y * _OffsetScale.w + _OffsetScale.y;
+                o.vertex = UnityObjectToClipPos(v.vertex);
+                return o;
+            }
+
+            fixed4 frag (v2f i) : SV_Target
+            {
+                return tex2D(_MainTex, i.texcoord);
+            }
+            ENDCG
+        }
+    }
+}

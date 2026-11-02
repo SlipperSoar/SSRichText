@@ -28,16 +28,55 @@ namespace SS.UIComponent
         private Dictionary<string, Vector4> _gifOffsetSclaes = new Dictionary<string, Vector4>();
         private Dictionary<int, ShadowRichInfo> _iconShadows;
         private static readonly int OffsetScale = Shader.PropertyToID("_OffsetScale");
+        private static readonly int SrcScaleId = Shader.PropertyToID("_SrcScale");
+        private static readonly int SrcOffsetId = Shader.PropertyToID("_SrcOffset");
 
         private int textureWidth;
         private int textureHeight;
         private RenderTexture rt;
         private Material blitMaterial;
+        private Material replaceMaterial;
 
         // 图标/动图集合没变时直接复用合并纹理，避免每次文本重建都重新 Blit
         private string combineSignature;
         private Dictionary<string, Vector4> cachedIconUvs;
         private Dictionary<string, Vector4> cachedGifUvs;
+
+        // 静态图标集合跨实例共享同一张图集：同一组表情在多个 RichText 上只合成一次
+        private static readonly Dictionary<string, SharedAtlas> SharedAtlases =
+            new Dictionary<string, SharedAtlas>(StringComparer.Ordinal);
+
+        private string sharedKey;
+        private SharedAtlas sharedAtlas;
+
+        private sealed class SharedAtlas
+        {
+            public RenderTexture Texture;
+            public int Refs;
+            public Dictionary<string, Vector4> IconUvs;
+        }
+
+        private sealed class AtlasItem
+        {
+            public string Id;
+            public int Width;
+            public int Height;
+            public int X;
+            public int Y;
+            public readonly List<AtlasContent> Contents = new List<AtlasContent>();
+        }
+
+        private struct AtlasContent
+        {
+            public readonly string Content;
+            public readonly bool IsGif;
+
+            public AtlasContent(string content, bool isGif)
+            {
+                Content = content;
+                IsGif = isGif;
+            }
+        }
 
         #endregion
         
@@ -59,53 +98,98 @@ namespace SS.UIComponent
 
             if (_sprites.Count == 0 && _gifs.Count == 0)
             {
+                ReleaseSharedAtlas();
                 ReleaseRenderTexture();
                 texture = null;
                 SetAllDirty();
                 return;
             }
 
-            var needCombine = !(_sprites.Count == 1 && _gifs.Count == 0) &&
-                              !(_sprites.Count == 0 && _gifs.Count == 1);
-
-            if (needCombine)
+            // 单个“整图”Sprite：不需要图集，直接用原图（最省的一条路）
+            if (_sprites.Count == 1 && _gifs.Count == 0)
             {
-                var signature = BuildCombineSignature(icons);
-                // 图标集合没变：复用已有的合并纹理，只重新应用 UV 并恢复 GIF 播放
-                if (rt != null && signature == combineSignature && TryApplyCachedCombine())
+                if (icons.TryGetValue(_sprites[0].Content, out var single) &&
+                    single != null && IsFullTextureSprite(single))
                 {
-                    texture = rt;
+                    ReleaseSharedAtlas();
+                    ReleaseRenderTexture();
+                    ApplySingleSprite(single.texture);
+                    return;
+                }
+            }
+
+            var signature = BuildCombineSignature(icons);
+            var canShare = _gifs.Count == 0;
+
+            // 纯静态图标：同一集合优先复用/共享图集
+            if (canShare)
+            {
+                if (sharedAtlas != null && sharedKey == signature && TryApplySharedAtlas())
+                {
+                    texture = sharedAtlas.Texture;
                     SetAllDirty();
                     return;
                 }
 
-                // 集合变化时才释放旧纹理并重新合成
                 ReleaseRenderTexture();
+                ReleaseSharedAtlas();
+
+                if (SharedAtlases.TryGetValue(signature, out var cached) && cached.Texture != null)
+                {
+                    cached.Refs++;
+                    sharedAtlas = cached;
+                    sharedKey = signature;
+                    ApplyUvsFrom(cached.IconUvs);
+                    texture = cached.Texture;
+                    SetAllDirty();
+                    return;
+                }
+
                 rt = CombineSprites(icons);
+                if (rt == null)
+                {
+                    ReleaseSharedAtlas();
+                    texture = null;
+                    SetAllDirty();
+                    return;
+                }
+
+                sharedAtlas = new SharedAtlas
+                {
+                    Texture = rt,
+                    Refs = 1,
+                    IconUvs = cachedIconUvs ?? new Dictionary<string, Vector4>()
+                };
+                sharedKey = signature;
+                SharedAtlases[signature] = sharedAtlas;
+
+                // 所有权转移给共享图集：之后由 ReleaseSharedAtlas 释放
                 texture = rt;
-                combineSignature = signature;
+                rt = null;
+                SetAllDirty();
+                return;
+            }
+
+            // 含 GIF：图集独立（GIF 逐帧写入，不能跨实例共享）
+            ReleaseSharedAtlas();
+            if (rt != null && combineSignature == signature && TryApplyCachedCombine())
+            {
+                texture = rt;
+                SetAllDirty();
                 return;
             }
 
             ReleaseRenderTexture();
-            if (_sprites.Count == 1)
-            {
-                ApplySingleSprite(icons[_sprites[0].Content].texture);
-            }
-            else
-            {
-                // 单个动图
-                foreach (var gif in gifs)
-                {
-                    ApplySingleGif(gif.Key, gif.Value);
-                    break;
-                }
-            }
+            rt = CombineSprites(icons);
+            combineSignature = rt != null ? signature : null;
+            texture = rt;
+            SetAllDirty();
         }
 
         public void Clear()
         {
             StopAllGifs();
+            ReleaseSharedAtlas();
             ReleaseRenderTexture();
             texture = null;
             _vertices = null;
@@ -139,7 +223,7 @@ namespace SS.UIComponent
                 verts[2].color = color * info.Color;
                 verts[3].color = color * info.Color;
 
-                if (_iconShadows.TryGetValue(info.StartIndex, out var shadowRichInfo))
+                if (_iconShadows != null && _iconShadows.TryGetValue(info.StartIndex, out var shadowRichInfo))
                 {
                     ApplyIconShadow(shadowRichInfo, verts, toFill);
                 }
@@ -165,7 +249,7 @@ namespace SS.UIComponent
                 verts[2].color = color * info.Color;
                 verts[3].color = color * info.Color;
 
-                if (_iconShadows.TryGetValue(info.StartIndex, out var shadowRichInfo))
+                if (_iconShadows != null && _iconShadows.TryGetValue(info.StartIndex, out var shadowRichInfo))
                 {
                     ApplyIconShadow(shadowRichInfo, verts, toFill);
                 }
@@ -181,9 +265,12 @@ namespace SS.UIComponent
             base.OnDestroy();
 
             StopAllGifs();
+            ReleaseSharedAtlas();
             ReleaseRenderTexture();
             DestroyNativeObject(blitMaterial);
             blitMaterial = null;
+            DestroyNativeObject(replaceMaterial);
+            replaceMaterial = null;
         }
 
         #endregion
@@ -215,6 +302,72 @@ namespace SS.UIComponent
         }
 
         /// <summary>
+        /// 归还共享图集的引用，引用归零时销毁纹理
+        /// </summary>
+        private void ReleaseSharedAtlas()
+        {
+            if (sharedAtlas == null)
+            {
+                return;
+            }
+
+            if (texture == sharedAtlas.Texture)
+            {
+                texture = null;
+            }
+
+            sharedAtlas.Refs--;
+            if (sharedAtlas.Refs <= 0)
+            {
+                if (sharedAtlas.Texture != null)
+                {
+                    RenderTexture.ReleaseTemporary(sharedAtlas.Texture);
+                }
+
+                if (!string.IsNullOrEmpty(sharedKey))
+                {
+                    SharedAtlases.Remove(sharedKey);
+                }
+            }
+
+            sharedAtlas = null;
+            sharedKey = null;
+        }
+
+        private bool TryApplySharedAtlas()
+        {
+            if (sharedAtlas == null || sharedAtlas.Texture == null)
+            {
+                return false;
+            }
+
+            return ApplyUvsFrom(sharedAtlas.IconUvs);
+        }
+
+        private bool ApplyUvsFrom(Dictionary<string, Vector4> uvs)
+        {
+            if (uvs == null || _sprites == null || _vertices == null)
+            {
+                return false;
+            }
+
+            for (var i = 0; i < _sprites.Count; i++)
+            {
+                if (!uvs.ContainsKey(_sprites[i].Content))
+                {
+                    return false;
+                }
+            }
+
+            for (var i = 0; i < _sprites.Count; i++)
+            {
+                ApplyUv(_vertices[i], uvs[_sprites[i].Content]);
+            }
+
+            return true;
+        }
+
+        /// <summary>
         /// 图标集合 + 动图集合的签名，用于判断合并纹理能否复用
         /// </summary>
         private string BuildCombineSignature(Dictionary<string, Sprite> icons)
@@ -222,7 +375,12 @@ namespace SS.UIComponent
             var parts = new List<string>(_sprites.Count + _gifs.Count + 1);
             foreach (var info in _sprites)
             {
-                parts.Add(info.Content + ":" + icons[info.Content].GetInstanceID());
+                if (!icons.TryGetValue(info.Content, out var sprite) || sprite == null)
+                {
+                    continue;
+                }
+
+                parts.Add(info.Content + ":" + sprite.GetInstanceID());
             }
 
             parts.Sort(StringComparer.Ordinal);
@@ -304,6 +462,11 @@ namespace SS.UIComponent
 
         private void PrepareGifs()
         {
+            if (_gifs == null)
+            {
+                return;
+            }
+
             foreach (var gif in _gifs)
             {
                 GifLoadManager.Instance.PrepareGif(gif.Key.Content);
@@ -324,7 +487,30 @@ namespace SS.UIComponent
             texture = texture2D;
             SetAllDirty();
         }
-        
+
+        /// <summary>
+        /// Sprite 是否就是整张贴图（只有这种才能免图集直接用）
+        /// </summary>
+        private static bool IsFullTextureSprite(Sprite sprite)
+        {
+            if (sprite.packed)
+            {
+                return false;
+            }
+
+            var spriteTexture = sprite.texture;
+            if (spriteTexture == null)
+            {
+                return false;
+            }
+
+            var rect = sprite.textureRect;
+            return Mathf.Approximately(rect.x, 0f) &&
+                   Mathf.Approximately(rect.y, 0f) &&
+                   Mathf.Approximately(rect.width, spriteTexture.width) &&
+                   Mathf.Approximately(rect.height, spriteTexture.height);
+        }
+
         private RenderTexture CombineSprites(Dictionary<string, Sprite> icons)
         {
             textureWidth = 0;
@@ -332,59 +518,69 @@ namespace SS.UIComponent
 
             (textureWidth, textureHeight) =
                 CalcOffsetForCombine(icons, out var iconOffsetSizes, out var gifOffsetSizes);
-            var totalWidth = (float)textureWidth;
-            var totalHeight = (float)textureHeight;
-            // TODO: 当图超过支持的最大大小时，会创建一个支持的最大大小，需要计算缩放
-            // 大概不用计算缩放
-            var renderTexture = RenderTexture.GetTemporary(textureWidth, textureHeight);
-            renderTexture.format = RenderTextureFormat.ARGB32;
+
+            if (textureWidth <= 0 || textureHeight <= 0)
+            {
+                return null;
+            }
+
+            var renderTexture = RenderTexture.GetTemporary(textureWidth, textureHeight, 0, RenderTextureFormat.ARGB32);
             var prevRT = RenderTexture.active;
             RenderTexture.active = renderTexture;
             GL.Clear(true, true, Color.clear);
-            // Material blitMaterial = new Material(Shader.Find("Custom/TextureCombineUV"));
+
             if (!blitMaterial)
             {
                 blitMaterial = new Material(Shader.Find("Custom/TextureCombineVert"));
             }
 
-            var iconUvs = new Dictionary<string, Vector4>(icons.Count);
+            var totalWidth = (float)textureWidth;
+            var totalHeight = (float)textureHeight;
+            var iconUvs = new Dictionary<string, Vector4>(iconOffsetSizes.Count);
+            var drawnSprites = new HashSet<int>();
+
             foreach (var iconOffsetSize in iconOffsetSizes)
             {
                 var offsetSize = iconOffsetSize.Value;
-                var sprite = icons[iconOffsetSize.Key];
-                var texture = sprite.texture;
-                var spriteRect = sprite.rect;
-                
-                // 计算图标的UV坐标
-                var uv = new Vector4((spriteRect.x + offsetSize.x) / totalWidth, (spriteRect.y + offsetSize.y) / totalHeight,
+                var uv = new Vector4(offsetSize.x / totalWidth, offsetSize.y / totalHeight,
                     (offsetSize.z + offsetSize.x) / totalWidth, (offsetSize.w + offsetSize.y) / totalHeight);
                 iconUvs.TryAddToDictionary(iconOffsetSize.Key, uv);
-                
-                // 计算 UV 偏移和缩放
-                // 偏移和缩放均是指将texture的uv映射到renderTexture上，也就是计算rt（renderTexture）的uv对应的texture的uv值
-                // texture的原始uv是[0, 1]，原封不动（scale = 1）时会铺满rt
-                // 可以把uv的缩放和偏移按照数轴上的区间来理解
-                // scale = rt.wdith / texture.wdith（height同理） 则是将uv缩放到与rt1：1的大小（[0,1]的uv拉伸到[0, scale]）
-                // 此时[0,1]即是rt上从左开始的texture原始比例大小
-                // [0, scale]在偏移(x, y)后，对应的就是[x, sclae + x]，[y, scale + y]
-                // 而texture的采样只能从0到1（[0, 1]），所以当x<0时，texture对应的区间会右移（y同理）
-                // 原本当uv<0或>1时，采样会有repeat、mirror、clamp等模式，使在这之外的区域被填充texture上对应模式下被采样到的像素
-                // 但可以通过丢弃片元的方式放弃对该像素的渲染，即可保留原本的渲染像素
-                // Vector2 offset = new Vector2(-currentX / spriteRect.width, 0);
-                // Vector2 scale = new Vector2(totalWidth / spriteRect.width, maxHeight / spriteRect.height);
-                
-                // 计算顶点位置偏移和缩放
-                // offset是从左到右的宽度比例
-                var offsetScale = new Vector4(offsetSize.x / totalWidth, offsetSize.y / totalHeight, offsetSize.z / totalWidth, offsetSize.w / totalHeight);
-                blitMaterial.SetVector(OffsetScale, offsetScale);
-                Graphics.Blit(texture, renderTexture, blitMaterial);
+
+                if (!icons.TryGetValue(iconOffsetSize.Key, out var sprite) || sprite == null)
+                {
+                    continue;
+                }
+
+                // 同一个 Sprite 被多处引用时只合成一次
+                if (!drawnSprites.Add(sprite.GetInstanceID()))
+                {
+                    continue;
+                }
+
+                var spriteTexture = sprite.texture;
+                if (spriteTexture == null)
+                {
+                    continue;
+                }
+
+                // 只取 Sprite 自己的区域，图集/多子图里的 Sprite 也能正确合成
+                var spriteRect = sprite.textureRect;
+                blitMaterial.SetVector(SrcScaleId, new Vector4(
+                    spriteRect.width / spriteTexture.width,
+                    spriteRect.height / spriteTexture.height, 0f, 0f));
+                blitMaterial.SetVector(SrcOffsetId, new Vector4(
+                    spriteRect.x / spriteTexture.width,
+                    spriteRect.y / spriteTexture.height, 0f, 0f));
+                blitMaterial.SetVector(OffsetScale, new Vector4(
+                    offsetSize.x / totalWidth, offsetSize.y / totalHeight,
+                    offsetSize.z / totalWidth, offsetSize.w / totalHeight));
+                Graphics.Blit(spriteTexture, renderTexture, blitMaterial);
             }
 
             var gifUvs = new Dictionary<string, Vector4>(gifOffsetSizes.Count);
             foreach (var gifOffsetSize in gifOffsetSizes)
             {
                 var offsetSize = gifOffsetSize.Value;
-                // 计算图标的UV坐标
                 var uv = new Vector4(offsetSize.x / totalWidth, offsetSize.y / totalHeight,
                     (offsetSize.z + offsetSize.x) / totalWidth, (offsetSize.w + offsetSize.y) / totalHeight);
                 gifUvs.TryAddToDictionary(gifOffsetSize.Key, uv);
@@ -392,30 +588,25 @@ namespace SS.UIComponent
 
             for (int i = 0; i < _sprites.Count; i++)
             {
-                var info = _sprites[i];
-                var verts = _vertices[i];
-                var uv = iconUvs[info.Content];
-                // uv是x y左下， z w右上，但这里顶点实际上是从左上开始的顺时针
-                verts[0].uv0 = new Vector2(uv.x, uv.w);
-                verts[1].uv0 = new Vector2(uv.z, uv.w);
-                verts[2].uv0 = new Vector2(uv.z, uv.y);
-                verts[3].uv0 = new Vector2(uv.x, uv.y);
+                if (iconUvs.TryGetValue(_sprites[i].Content, out var uv))
+                {
+                    ApplyUv(_vertices[i], uv);
+                }
             }
 
             foreach (var gif in _gifs)
             {
-                var uv = gifUvs[gif.Key.Content];
-                var verts = gif.Value;
-                verts[0].uv0 = new Vector2(uv.x, uv.w);
-                verts[1].uv0 = new Vector2(uv.z, uv.w);
-                verts[2].uv0 = new Vector2(uv.z, uv.y);
-                verts[3].uv0 = new Vector2(uv.x, uv.y);
+                if (!gifUvs.TryGetValue(gif.Key.Content, out var uv))
+                {
+                    continue;
+                }
 
-                var gifName = gif.Key.Content;
+                ApplyUv(gif.Value, uv);
+
                 if (Application.isPlaying)
                 {
                     RefreshGifOffsetScale(gif.Key);
-                    GifLoadManager.Instance.AddGifPlayer(gifName, PlayGif);
+                    GifLoadManager.Instance.AddGifPlayer(gif.Key.Content, PlayGif);
                 }
             }
 
@@ -426,7 +617,8 @@ namespace SS.UIComponent
         }
 
         /// <summary>
-        /// 计算图像拼接时的偏移
+        /// 计算图像拼接时的偏移与尺寸。
+        /// 采用 shelf packing，并按 SystemInfo.maxTextureSize 限制尺寸，避免拼出硬件不支持的超大图集。
         /// </summary>
         /// <param name="icons">所有的图标</param>
         /// <param name="iconOffsetSizes">图标的偏移+尺寸信息</param>
@@ -434,7 +626,6 @@ namespace SS.UIComponent
         /// <returns>图像的宽高</returns>
         private (int width, int height) CalcOffsetForCombine(Dictionary<string, Sprite> icons, out Dictionary<string, Vector4> iconOffsetSizes, out Dictionary<string, Vector4> gifOffsetSizes)
         {
-            // 主要是担心icon和gif会存在重名，所以分开处理
             iconOffsetSizes = new Dictionary<string, Vector4>(icons.Count);
             gifOffsetSizes = new Dictionary<string, Vector4>(_gifs.Count);
 
@@ -442,181 +633,124 @@ namespace SS.UIComponent
             {
                 return (0, 0);
             }
-            
-            var totalWidth = 0;
-            var maxHeight = 0;
-            
-            // 首先对gif进行去重+初始化
-            foreach (var gif in _gifs)
-            {
-                var gifSize = GifLoadManager.Instance.GetGifSize(gif.Key.Content);
-                gifOffsetSizes.TryAddToDictionary(gif.Key.Content, new Vector4(0, 0, gifSize.x, gifSize.y));
-                totalWidth += gifSize.x;
-                maxHeight = Mathf.Max(maxHeight, gifSize.y);
-            }
 
-            // 然后对icon进行初始化
+            var maxSize = Mathf.Min(SystemInfo.maxTextureSize, 8192);
+            var items = new List<AtlasItem>(icons.Count + _gifs.Count);
+            var byId = new Dictionary<string, AtlasItem>(StringComparer.Ordinal);
+
+            // 先按 Sprite/GIF 去重：同一张贴图只占一块位置
             foreach (var icon in icons)
             {
-                var width = icon.Value.rect.width;
-                var height = icon.Value.rect.height;
-                iconOffsetSizes.TryAddToDictionary(icon.Key, new Vector4(0, 0, width, height));
-                totalWidth += (int)width;
-                maxHeight = Mathf.Max(maxHeight, (int)height);
-            }
-            
-            // 按行拼，计算需要有几行
-            var rowCount = Mathf.Max(1, totalWidth / maxHeight);
-            // n行需要至少有n个图
-            var totalCount = iconOffsetSizes.Count + gifOffsetSizes.Count;
-            if (totalCount < rowCount)
-            {
-                rowCount = totalCount;
+                var sprite = icon.Value;
+                if (sprite == null)
+                {
+                    continue;
+                }
+
+                var id = "i" + sprite.GetInstanceID();
+                if (!byId.TryGetValue(id, out var item))
+                {
+                    var rect = sprite.rect;
+                    item = new AtlasItem
+                    {
+                        Id = id,
+                        Width = Mathf.Max(1, Mathf.RoundToInt(rect.width)),
+                        Height = Mathf.Max(1, Mathf.RoundToInt(rect.height))
+                    };
+                    byId.Add(id, item);
+                    items.Add(item);
+                }
+
+                item.Contents.Add(new AtlasContent(icon.Key, false));
             }
 
-            // 先按照图像宽度排序，true=icon，false=gif
-            var sortedIndexes = new LinkedList<(bool, string, Vector4)>();
-            // 先拿icon排序
-            foreach (var offsetSize in iconOffsetSizes)
+            foreach (var gif in _gifs)
             {
-                if (sortedIndexes.Count == 0)
+                var id = "g" + gif.Key.Content;
+                if (!byId.TryGetValue(id, out var item))
                 {
-                    sortedIndexes.AddFirst((true, offsetSize.Key, offsetSize.Value));
-                }
-                else
-                {
-                    var node = sortedIndexes.First;
-                    bool isAdded = false;
-                    do
+                    var size = GifLoadManager.Instance.GetGifSize(gif.Key.Content);
+                    item = new AtlasItem
                     {
-                        if (node.Value.Item3.z < offsetSize.Value.z)
-                        {
-                            sortedIndexes.AddBefore(node, (true, offsetSize.Key, offsetSize.Value));
-                            isAdded = true;
-                            break;
-                        }
-                        else
-                        {
-                            node = node.Next;
-                        }
-                    } while (node != null);
+                        Id = id,
+                        Width = Mathf.Max(1, size.x),
+                        Height = Mathf.Max(1, size.y)
+                    };
+                    byId.Add(id, item);
+                    items.Add(item);
+                }
 
-                    if (!isAdded)
-                    {
-                        sortedIndexes.AddLast((true, offsetSize.Key, offsetSize.Value));
-                    }
-                }
+                item.Contents.Add(new AtlasContent(gif.Key.Content, true));
             }
-            
-            // 再拿gif排序
-            foreach (var offsetSize in gifOffsetSizes)
+
+            if (items.Count == 0)
             {
-                if (sortedIndexes.Count == 0)
-                {
-                    sortedIndexes.AddFirst((false, offsetSize.Key, offsetSize.Value));
-                }
-                else
-                {
-                    var node = sortedIndexes.First;
-                    bool isAdded = false;
-                    do
-                    {
-                        if (node.Value.Item3.z < offsetSize.Value.z)
-                        {
-                            sortedIndexes.AddBefore(node, (false, offsetSize.Key, offsetSize.Value));
-                            isAdded = true;
-                            break;
-                        }
-                        else
-                        {
-                            node = node.Next;
-                        }
-                    } while (node != null);
-                    
-                    if (!isAdded)
-                    {
-                        sortedIndexes.AddLast((false, offsetSize.Key, offsetSize.Value));
-                    }
-                }
+                return (0, 0);
             }
-            
-            // 合并计算位置
-            var totalHeight = 0;
-            totalWidth = 0;
+
+            // 按高度降序排列，shelf packing 的碎片更少
+            items.Sort((a, b) => b.Height.CompareTo(a.Height));
+
+            long area = 0;
+            foreach (var item in items)
             {
-                // 每行的当前偏移(x y 当前行最高高度)
-                var offsets = new Vector3[rowCount];
-                // 先计算每一行的x偏移和当前行最高高度
-                var currentRow = 0;
-                var node = sortedIndexes.First;
-                do
+                area += (long)item.Width * item.Height;
+            }
+
+            var targetWidth = Mathf.Clamp(Mathf.NextPowerOfTwo(Mathf.CeilToInt(Mathf.Sqrt(area))), 64, maxSize);
+
+            var x = 0;
+            var y = 0;
+            var rowHeight = 0;
+            var usedWidth = 0;
+
+            foreach (var item in items)
+            {
+                var w = item.Width;
+                var h = item.Height;
+
+                if (x > 0 && x + w > targetWidth)
                 {
-                    var offset = offsets[currentRow];
-                    var nodeValue = node.Value;
-                    if (nodeValue.Item1)
+                    y += rowHeight;
+                    x = 0;
+                    rowHeight = 0;
+                }
+
+                item.X = x;
+                item.Y = y;
+                x += w;
+                rowHeight = Mathf.Max(rowHeight, h);
+                usedWidth = Mathf.Max(usedWidth, x);
+            }
+
+            var totalWidth = Mathf.Max(1, usedWidth);
+            var totalHeight = Mathf.Max(1, y + rowHeight);
+
+            // 超出硬件上限时整体等比缩小：图标会被降采样，但布局与 UV 仍然一致
+            var scale = 1f;
+            if (totalWidth > maxSize || totalHeight > maxSize)
+            {
+                scale = Mathf.Min((float)maxSize / totalWidth, (float)maxSize / totalHeight);
+                Debug.LogWarning($"[RichText] Icon atlas {totalWidth}x{totalHeight} exceeds {maxSize}, scaled to {scale:0.###}.");
+            }
+
+            foreach (var item in items)
+            {
+                var rect = new Vector4(item.X * scale, item.Y * scale, item.Width * scale, item.Height * scale);
+                foreach (var content in item.Contents)
+                {
+                    if (content.IsGif)
                     {
-                        var offsetSize = iconOffsetSizes[nodeValue.Item2];
-                        offsetSize.x = offset.x;
-                        iconOffsetSizes[nodeValue.Item2] = offsetSize;
-                        // 更新x偏移
-                        offset.x += offsetSize.z;
-                        offset.z = Mathf.Max(offset.z, offsetSize.w);
-                        offsets[currentRow] = offset;
-                        totalWidth = Mathf.Max(totalWidth, (int)offset.x);
+                        gifOffsetSizes[content.Content] = rect;
                     }
                     else
                     {
-                        var offsetSize = gifOffsetSizes[nodeValue.Item2];
-                        offsetSize.x = offset.x;
-                        gifOffsetSizes[nodeValue.Item2] = offsetSize;
-                        // 更新x偏移
-                        offset.x += offsetSize.z;
-                        offset.z = Mathf.Max(offset.z, offsetSize.w);
-                        offsets[currentRow] = offset;
-                        totalWidth = Mathf.Max(totalWidth, (int)offset.x);
+                        iconOffsetSizes[content.Content] = rect;
                     }
-
-                    currentRow = (currentRow + 1) % rowCount;
-                    node = node.Next;
-                } while (node != null);
-
-                // 再计算y偏移
-                for (int i = 1; i < offsets.Length; i++)
-                {
-                    var offset = offsets[i];
-                    var lastOffset = offsets[i - 1];
-                    offset.y = lastOffset.y + lastOffset.z;
-                    offsets[i] = offset;
                 }
-                
-                currentRow = 0;
-                node = sortedIndexes.First;
-                do
-                {
-                    var offset = offsets[currentRow];
-                    var nodeValue = node.Value;
-                    if (nodeValue.Item1)
-                    {
-                        var offsetSize = iconOffsetSizes[nodeValue.Item2];
-                        offsetSize.y = offset.y;
-                        iconOffsetSizes[nodeValue.Item2] = offsetSize;
-                    }
-                    else
-                    {
-                        var offsetSize = gifOffsetSizes[nodeValue.Item2];
-                        offsetSize.y = offset.y;
-                        gifOffsetSizes[nodeValue.Item2] = offsetSize;
-                    }
-
-                    currentRow = (currentRow + 1) % rowCount;
-                    node = node.Next;
-                } while (node != null);
-                
-                var topRowOffset = offsets[rowCount - 1];
-                totalHeight = (int)(topRowOffset.y + topRowOffset.z);
             }
 
-            return (totalWidth, totalHeight);
+            return (Mathf.Max(1, Mathf.RoundToInt(totalWidth * scale)), Mathf.Max(1, Mathf.RoundToInt(totalHeight * scale)));
         }
         
         private void ApplySingleGif(RichInfo richInfo, UIVertex[] vertices)
@@ -779,11 +913,21 @@ namespace SS.UIComponent
 
         private void PlayGif(string gifName, GifData gifData)
         {
-            if (_gifOffsetSclaes.TryGetValue(gifName, out var offsetScale))
+            if (rt == null || !_gifOffsetSclaes.TryGetValue(gifName, out var offsetScale))
             {
-                blitMaterial.SetVector(OffsetScale, offsetScale);
-                Graphics.Blit(gifData.FrameTexture, rt, blitMaterial);
+                return;
             }
+
+            // 用不混合的材质整块覆盖 GIF 子区域：否则半透明帧会和上一帧叠加出残影
+            if (replaceMaterial == null)
+            {
+                replaceMaterial = new Material(Shader.Find("Custom/TextureCombineReplace"));
+            }
+
+            replaceMaterial.SetVector(OffsetScale, offsetScale);
+            replaceMaterial.SetVector(SrcScaleId, new Vector4(1f, 1f, 0f, 0f));
+            replaceMaterial.SetVector(SrcOffsetId, Vector4.zero);
+            Graphics.Blit(gifData.FrameTexture, rt, replaceMaterial);
         }
 
         #endregion

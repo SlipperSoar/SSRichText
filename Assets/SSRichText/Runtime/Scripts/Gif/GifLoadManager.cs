@@ -25,7 +25,20 @@ namespace SS.UIComponent
             public string GifName;
             public float CountDown;
             public int Index;
-            public UnityEvent<string, GifData> Player;
+            public readonly List<UnityAction<string, GifData>> Listeners = new List<UnityAction<string, GifData>>();
+
+            public void AddListener(UnityAction<string, GifData> listener)
+            {
+                if (listener != null)
+                {
+                    Listeners.Add(listener);
+                }
+            }
+
+            public bool RemoveListener(UnityAction<string, GifData> listener)
+            {
+                return Listeners.Remove(listener);
+            }
 
             public void Update(List<GifData> gifDatas)
             {
@@ -33,7 +46,12 @@ namespace SS.UIComponent
                 if (CountDown >= gifData.DelaySecond)
                 {
                     CountDown -= gifData.DelaySecond;
-                    Player.Invoke(GifName, gifData);
+                    // Invoke every subscriber: one player is shared by all RichText
+                    // instances that display the same gif.
+                    for (var i = 0; i < Listeners.Count; i++)
+                    {
+                        Listeners[i](GifName, gifData);
+                    }
                     Index++;
                     Index %= gifDatas.Count;
                 }
@@ -293,20 +311,16 @@ namespace SS.UIComponent
         public void AddGifPlayer(string gifName, UnityAction<string, GifData> onUpdate)
         {
             GifPlayer gifPlayer;
-            if (gifPlayers.TryGetValue(gifName, out gifPlayer))
+            if (!gifPlayers.TryGetValue(gifName, out gifPlayer))
             {
-                gifPlayer.Player.AddListener(onUpdate);
-            }
-            else
-            {
-                gifPlayer = new GifPlayer()
+                gifPlayer = new GifPlayer
                 {
-                    GifName = gifName,
-                    Player = new UnityEvent<string, GifData>()
+                    GifName = gifName
                 };
-                gifPlayer.Player.AddListener(onUpdate);
                 gifPlayers.Add(gifName, gifPlayer);
             }
+
+            gifPlayer.AddListener(onUpdate);
         }
 
         /// <summary>
@@ -318,8 +332,8 @@ namespace SS.UIComponent
         {
             if (gifPlayers.TryGetValue(gifName, out var gifPlayer))
             {
-                gifPlayer.Player.RemoveListener(onUpdate);
-                if (gifPlayer.Player.GetPersistentEventCount() == 0)
+                gifPlayer.RemoveListener(onUpdate);
+                if (gifPlayer.Listeners.Count == 0)
                 {
                     gifPlayers.Remove(gifName);
                 }

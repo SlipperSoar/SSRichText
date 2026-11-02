@@ -11,6 +11,8 @@ Shader "Custom/TextureCombineVert"
 	    _ColorMask ("Color Mask", Float) = 15
         
         _OffsetScale ("OffsetScale", Vector) = (0,0,1,1)
+        _SrcScale ("Src Scale", Vector) = (1,1,0,0)
+        _SrcOffset ("Src Offset", Vector) = (0,0,0,0)
     }
     SubShader
     {
@@ -49,13 +51,15 @@ Shader "Custom/TextureCombineVert"
             sampler2D _MainTex;
             float4 _MainTex_ST;
             float4 _OffsetScale;
+            float4 _SrcScale;
+            float4 _SrcOffset;
 
             v2f vert (appdata v)
             {
                 v2f o;
                 UNITY_SETUP_INSTANCE_ID(v);
                 UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(o);// 实例化处理
-                o.texcoord = TRANSFORM_TEX(v.texcoord, _MainTex);
+                o.texcoord = v.texcoord * _SrcScale.xy + _SrcOffset.xy;
 
                 v.vertex.x = v.vertex.x * _OffsetScale.z + _OffsetScale.x;
                 v.vertex.y = v.vertex.y * _OffsetScale.w + _OffsetScale.y;
