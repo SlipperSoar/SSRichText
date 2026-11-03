@@ -29,7 +29,7 @@ namespace SS.UIComponent
 
             public void AddListener(UnityAction<string, GifData> listener)
             {
-                if (listener != null)
+                if (listener != null && !Listeners.Contains(listener))
                 {
                     Listeners.Add(listener);
                 }

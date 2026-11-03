@@ -41,6 +41,7 @@ namespace SS.UIComponent
         private string combineSignature;
         private Dictionary<string, Vector4> cachedIconUvs;
         private Dictionary<string, Vector4> cachedGifUvs;
+        private bool usingSingleGif;
 
         // 静态图标集合跨实例共享同一张图集：同一组表情在多个 RichText 上只合成一次
         private static readonly Dictionary<string, SharedAtlas> SharedAtlases =
@@ -324,7 +325,9 @@ namespace SS.UIComponent
                     RenderTexture.ReleaseTemporary(sharedAtlas.Texture);
                 }
 
-                if (!string.IsNullOrEmpty(sharedKey))
+                if (!string.IsNullOrEmpty(sharedKey) &&
+                    SharedAtlases.TryGetValue(sharedKey, out var registered) &&
+                    ReferenceEquals(registered, sharedAtlas))
                 {
                     SharedAtlases.Remove(sharedKey);
                 }
@@ -407,6 +410,7 @@ namespace SS.UIComponent
                 return false;
             }
 
+            usingSingleGif = false;
             for (var i = 0; i < _sprites.Count; i++)
             {
                 if (!cachedIconUvs.TryGetValue(_sprites[i].Content, out var uv))
@@ -594,6 +598,7 @@ namespace SS.UIComponent
                 }
             }
 
+            usingSingleGif = false;
             foreach (var gif in _gifs)
             {
                 if (!gifUvs.TryGetValue(gif.Key.Content, out var uv))
@@ -760,6 +765,7 @@ namespace SS.UIComponent
             vertices[1].uv0 = new Vector4(1, 1);
             vertices[2].uv0 = new Vector4(1, 0);
             vertices[3].uv0 = new Vector4(0, 0);
+            usingSingleGif = true;
             if (Application.isPlaying)
             {
                 GifLoadManager.Instance.AddGifPlayer(richInfo.Content, PlaySingleGif);
@@ -878,7 +884,8 @@ namespace SS.UIComponent
                 return;
             }
 
-            if (_gifs.Count == 1)
+            // 用记录的模式移除，避免“单 GIF + 图标”走图集路径时移除错误的回调
+            if (usingSingleGif)
             {
                 foreach (var gif in _gifs)
                 {

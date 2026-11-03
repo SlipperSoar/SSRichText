@@ -17,9 +17,10 @@
 
 - **标签即排版**：描边、阴影、下划线、删除线、四角渐变都可以直接写在文本里，无需拆分多个 UI 节点。
 - **内联图标与动图**：`<icon=name/>`、`<gif=name/>` 占用一个字符位，大小随字号自动变化；图标和动图会合并到临时贴图中渲染，不必为每个图标创建一个 `Image`。
+- **图标图集自动管理**：图标按 shelf packing 合成，超过 `SystemInfo.maxTextureSize` 时等比缩小；相同图标集合会在多个 `RichText` 之间共享同一张图集。
 - **统一点击事件**：所有标签共用一个 `OnClick` 回调，参数包含标签类型与对应内容，图文混排、点击文中链接或图标都很方便。
 - **可替换资源来源**：`IIconProvider` / `IGifProvider` 可以接管图标与 GIF 的加载逻辑（图集、AB 包、远端等）。
-- **GIF 自动管理**：首次显示时自动创建 `GifLoadManager`，后台解析、统一播放，闲置缓存会自动清理。
+- **GIF 自动管理**：首次显示时自动创建 `GifLoadManager`，后台线程解码、统一播放，闲置缓存会自动清理。
 - 继承自 `Text`，原有属性（字体、字号、对齐、换行、`Raycast Target` 等）继续生效。
 
 ## 环境要求
@@ -45,7 +46,7 @@ https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText
 需要固定版本时在末尾追加 tag，例如：
 
 ```text
-https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText#v2.6.0
+https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText#v2.7.0
 ```
 
 也可以直接写进 `Packages/manifest.json`：
@@ -53,7 +54,7 @@ https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText#v2.6.0
 ```json
 {
   "dependencies": {
-    "com.github-slippersoar.ssrichtext": "https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText#v2.6.0"
+    "com.github-slippersoar.ssrichtext": "https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText#v2.7.0"
   }
 }
 ```

@@ -17,9 +17,10 @@ A rich text component for Unity's legacy UGUI `Text`. On top of the built-in `<b
 
 - **Tags as layout** — outline, shadow, underline, strikethrough and four-corner gradients are written directly in the text; no extra UI nodes required.
 - **Inline icons and GIFs** — `<icon=name/>` and `<gif=name/>` occupy one character cell and scale with the font size. Icons and GIFs are merged into a temporary texture instead of creating an `Image` per icon.
+- **Automatic icon atlasing** — icons are shelf-packed, downscaled uniformly when they exceed `SystemInfo.maxTextureSize`, and the same icon set is shared between `RichText` instances.
 - **One click event for everything** — every tag shares the same `OnClick` callback, which receives the tag type and its content, so links, icons and mixed text are easy to handle.
 - **Pluggable asset sources** — `IIconProvider` / `IGifProvider` let you load icons and GIFs from atlases, asset bundles, remote servers, etc.
-- **Automatic GIF management** — `GifLoadManager` is created on first use, decodes in the background, plays frames in one place and releases unused data.
+- **Automatic GIF management** — `GifLoadManager` is created on first use, decodes on a background thread, plays frames in one place and releases unused data.
 - Inherits from `Text`, so font, font size, alignment, wrapping, `Raycast Target` and other properties keep working.
 
 ## Requirements
@@ -45,7 +46,7 @@ https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText
 To pin a version, append a tag:
 
 ```text
-https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText#v2.6.0
+https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText#v2.7.0
 ```
 
 Or add it to `Packages/manifest.json` directly:
@@ -53,7 +54,7 @@ Or add it to `Packages/manifest.json` directly:
 ```json
 {
   "dependencies": {
-    "com.github-slippersoar.ssrichtext": "https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText#v2.6.0"
+    "com.github-slippersoar.ssrichtext": "https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText#v2.7.0"
   }
 }
 ```

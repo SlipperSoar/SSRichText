@@ -4,6 +4,21 @@
 
 ## [Unreleased]
 
+## [2.7.0] - 2026-11-03
+
+### Added
+
+- 图标图集改为 shelf packing，并按 `SystemInfo.maxTextureSize` 等比缩放；同一个 Sprite 只 Blit 一次。
+- 支持 Sprite 位于大图集的子区域：按 `textureRect` 计算源 UV，图标可以正确取子图。
+- 相同图标集合的图集在多个 `RichText` 实例之间共享，带引用计数，引用归零时释放。
+- 同一个 GIF 的播放器支持多个监听者，多个 `RichText` 显示同一动图时共用一个播放器。
+
+### Fixed
+
+- GIF 帧改为用不混合的材质覆盖写入图集子区域，修复半透明帧叠加产生残影的问题。
+- 修正“单个 GIF + 图标”走图集路径时移除错误播放回调的问题。
+- 避免同一 GIF 重复注册监听。
+
 ## [2.6.0] - 2026-10-31
 
 ### Added
@@ -166,7 +181,8 @@
 
 - 首个版本：基于 Unity 原生 UI Text 的富文本组件。
 
-[Unreleased]: https://github.com/SlipperSoar/SSRichText/compare/v2.6.0...HEAD
+[Unreleased]: https://github.com/SlipperSoar/SSRichText/compare/v2.7.0...HEAD
+[2.7.0]: https://github.com/SlipperSoar/SSRichText/compare/v2.6.0...v2.7.0
 [2.6.0]: https://github.com/SlipperSoar/SSRichText/compare/v2.5.0...v2.6.0
 [2.5.0]: https://github.com/SlipperSoar/SSRichText/compare/v2.4.0...v2.5.0
 [2.4.0]: https://github.com/SlipperSoar/SSRichText/compare/v2.3.1...v2.4.0
