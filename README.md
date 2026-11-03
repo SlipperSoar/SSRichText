@@ -46,7 +46,7 @@ https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText
 需要固定版本时在末尾追加 tag，例如：
 
 ```text
-https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText#v2.7.0
+https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText#v2.8.0
 ```
 
 也可以直接写进 `Packages/manifest.json`：
@@ -54,7 +54,7 @@ https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText#v2.7.0
 ```json
 {
   "dependencies": {
-    "com.github-slippersoar.ssrichtext": "https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText#v2.7.0"
+    "com.github-slippersoar.ssrichtext": "https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText#v2.8.0"
   }
 }
 ```
@@ -194,6 +194,8 @@ RichText.GlobalIconProvider = new MyIconProvider();
 
 - 图标名支持字母、数字以及 `_`、`-`、`(`、`)`、`.`、`/`，因此可以放在 `Resources` 的子目录里：`<icon=Icons/heart/>` 等价于 `Resources.Load<Sprite>("Icons/heart")`；写成 `Icons\heart` 也会自动转成 `/`。不支持空格，也不要写扩展名（写 `heart`，不要写 `heart.png`）。
 - 图标占一个字符位，尺寸随字号变化；找不到图标时，占位字符保持透明，不会显示乱码方块。
+- 图标会按 Sprite 原始宽高比在字符格内内切，不会被拉伸；共享图集默认最多同时保留 16 组（`RichTextIconImage.MaxSharedAtlasCount`），超过后新集合使用组件私有图集。
+- 内置 Shader 位于 `Runtime/Resources/SSRichText/`，打包时自动包含，无需手动加入 Always Included Shaders；旧安装仍保留 `Shader.Find` 兜底。
 - `<shadow>` 同样作用于图标，并支持四角方向。
 
 ## GIF 动图
@@ -245,7 +247,7 @@ GifLoadManager.Instance.AddGifData(
 
 - 仅支持 Legacy `Text`，不支持 TextMeshPro。
 - GIF 文件里的纯文本扩展块（Plain Text Extension）不会被绘制到画面上。它是 GIF 内部的元数据，常见于版权、作者、说明等信息，并不是叠加在动图上的文字；本组件只解析和保留内容，不参与渲染。
-- 图标与动图各占一个字符位，超大图片会被压缩到该字符格内显示。
+- 图标与动图各占一个字符位，超大图片会被缩放到该字符格内；图标会保持原始宽高比内切，不会拉伸。
 - GIF 解码默认在后台线程完成，主线程只上传纹理；WebGL 等平台退回主线程时，超大 GIF 首次显示会阻塞更久。
 - 关闭 `supportRichText` 会退化为原生 `Text` 的行为，扩展标签不再生效。
 

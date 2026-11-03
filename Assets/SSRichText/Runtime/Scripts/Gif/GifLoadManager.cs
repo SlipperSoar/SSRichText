@@ -270,9 +270,6 @@ namespace SS.UIComponent
 
         public void PrepareGif(string gifName, bool dontClear = false, bool forceBgColorTransparent = false)
         {
-#if UNITY_EDITOR
-            Debug.Log($"Load Gif: {gifName}, forceBgColorTransparent: {forceBgColorTransparent}");
-#endif
             if (gifLoadStatus.TryGetValue(gifName, out var isLoaded))
             {
                 if (isLoaded)
@@ -337,10 +334,6 @@ namespace SS.UIComponent
                 {
                     gifPlayers.Remove(gifName);
                 }
-            }
-            else
-            {
-                Debug.LogWarning($"GifPlayer not found: {gifName}, is it already be removed?");
             }
         }
         

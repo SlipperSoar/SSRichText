@@ -5,7 +5,6 @@
  */
 
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 #if UNITY_EDITOR
@@ -92,6 +91,14 @@ namespace SS.UIComponent
         private string parsedTextWithoutTag;
         private List<RichInfo> parsedRichInfos;
 
+        // 图标层更新：同一帧多次重建只应用最后一次，避免每次 OnPopulateMesh 都开协程
+        private bool iconUpdatePending;
+        private List<RichInfo> pendingIconInfos;
+        private Dictionary<string, Sprite> pendingIcons;
+        private List<UIVertex[]> pendingIconVerts;
+        private Dictionary<int, ShadowRichInfo> pendingIconShadows;
+        private Dictionary<RichInfo, UIVertex[]> pendingGifs;
+
 
 #if UNITY_EDITOR
         [MenuItem("GameObject/UI/SS/Rich Text", false, 20)]
@@ -132,6 +139,30 @@ namespace SS.UIComponent
 #endif
 
 
+
+        protected override void OnEnable()
+        {
+            base.OnEnable();
+            Canvas.willRenderCanvases += FlushIconUpdate;
+        }
+
+        protected override void OnDisable()
+        {
+            Canvas.willRenderCanvases -= FlushIconUpdate;
+            iconUpdatePending = false;
+            pendingIconInfos = null;
+            pendingIcons = null;
+            pendingIconVerts = null;
+            pendingIconShadows = null;
+            pendingGifs = null;
+            base.OnDisable();
+        }
+
+        protected override void OnDestroy()
+        {
+            Canvas.willRenderCanvases -= FlushIconUpdate;
+            base.OnDestroy();
+        }
 
         protected override void OnPopulateMesh(VertexHelper toFill)
         {
@@ -280,7 +311,7 @@ namespace SS.UIComponent
                 // 计算完把划线用的uv清掉
                 lineUVs = null;
                 // 避免同时更新渲染
-                StartCoroutine(CallIconUpdate(iconInfos, icons, iconVerts, iconShadows, gifs));
+                QueueIconUpdate(iconInfos, icons, iconVerts, iconShadows, gifs);
                 return;
             }
 
@@ -364,7 +395,7 @@ namespace SS.UIComponent
             // 计算完把下划线用的uv清掉
             lineUVs = null;
             // 避免同时更新渲染
-            StartCoroutine(CallIconUpdate(iconInfos, icons, iconVerts, iconShadows, gifs));
+            QueueIconUpdate(iconInfos, icons, iconVerts, iconShadows, gifs);
 
             m_DisableFontTextureRebuiltCallback = false;
         }
@@ -420,21 +451,59 @@ namespace SS.UIComponent
 
 
 
-        private IEnumerator CallIconUpdate(List<RichInfo> iconInfos, Dictionary<string, Sprite> icons,
+        private void QueueIconUpdate(List<RichInfo> iconInfos, Dictionary<string, Sprite> icons,
             List<UIVertex[]> vertices, Dictionary<int, ShadowRichInfo> iconShadows, Dictionary<RichInfo, UIVertex[]> gifs)
         {
-            yield return null;
-            // 处理图标
-            var needShowIcons = iconInfos.Count > 0 || gifs.Count > 0;
-            iconImage.gameObject.SetActive(needShowIcons);
-            if (needShowIcons)
+            pendingIconInfos = iconInfos;
+            pendingIcons = icons;
+            pendingIconVerts = vertices;
+            pendingIconShadows = iconShadows;
+            pendingGifs = gifs;
+            iconUpdatePending = true;
+        }
+
+        /// <summary>
+        /// 在当前帧的 Canvas 更新结束后统一应用图标层，并立即重建子 RawImage
+        /// </summary>
+        private void FlushIconUpdate()
+        {
+            if (!iconUpdatePending)
             {
-                iconImage.SetIcons(iconInfos, icons, vertices, iconShadows, gifs);
+                return;
             }
-            else
+
+            iconUpdatePending = false;
+            var iconInfos = pendingIconInfos;
+            var icons = pendingIcons;
+            var vertices = pendingIconVerts;
+            var iconShadows = pendingIconShadows;
+            var gifs = pendingGifs;
+            pendingIconInfos = null;
+            pendingIcons = null;
+            pendingIconVerts = null;
+            pendingIconShadows = null;
+            pendingGifs = null;
+
+            var needShowIcons = (iconInfos != null && iconInfos.Count > 0) ||
+                                (gifs != null && gifs.Count > 0);
+
+            if (!needShowIcons)
             {
-                iconImage.Clear();
+                if (_iconImage != null)
+                {
+                    _iconImage.gameObject.SetActive(false);
+                    _iconImage.Clear();
+                }
+
+                return;
             }
+
+            var image = iconImage;
+            image.gameObject.SetActive(true);
+            image.SetIcons(iconInfos, icons, vertices, iconShadows, gifs);
+            // willRenderCanvases 中 CanvasUpdateRegistry 已经执行完，这里主动重建一次，
+            // 让图标与文本在同一帧生效
+            image.Rebuild(CanvasUpdate.PreRender);
         }
 
     }

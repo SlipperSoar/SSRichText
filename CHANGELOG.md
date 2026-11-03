@@ -4,6 +4,21 @@
 
 ## [Unreleased]
 
+## [2.8.0] - 2026-11-03
+
+### Changed
+
+- `TextureCombineVert` / `TextureCombineReplace` 移入 `Runtime/Resources/SSRichText/`，运行时优先 `Resources.Load`，避免打包后 `Shader.Find` 返回 null；保留 `Shader.Find` 作为旧安装兜底。
+- `RichText` 的图标层更新改为脏标记 + `Canvas.willRenderCanvases`：同一帧多次 `OnPopulateMesh` 只应用最后一次，移除每次重建的 `StartCoroutine`，避免协程 GC 和对象禁用时的异常。
+- 合并图集签名改为无分配的 `ulong` 哈希，去掉字符串拼接与排序。
+- 共享图集新增 `RichTextIconImage.MaxSharedAtlasCount`（默认 16）；超过后新集合使用组件私有图集，避免静态缓存无限增长。
+- 图标按 Sprite 原始比例在字符格内内切，不再拉伸。
+- 移除 `GifLoadManager` 每次 `PrepareGif` 的 `Debug.Log`，以及找不到播放器时的 warning。
+
+### Fixed
+
+- 修复打包后自定义 Shader 可能被裁剪，导致图标/GIF 合成失败的问题。
+
 ## [2.7.0] - 2026-11-03
 
 ### Added
@@ -181,7 +196,8 @@
 
 - 首个版本：基于 Unity 原生 UI Text 的富文本组件。
 
-[Unreleased]: https://github.com/SlipperSoar/SSRichText/compare/v2.7.0...HEAD
+[Unreleased]: https://github.com/SlipperSoar/SSRichText/compare/v2.8.0...HEAD
+[2.8.0]: https://github.com/SlipperSoar/SSRichText/compare/v2.7.0...v2.8.0
 [2.7.0]: https://github.com/SlipperSoar/SSRichText/compare/v2.6.0...v2.7.0
 [2.6.0]: https://github.com/SlipperSoar/SSRichText/compare/v2.5.0...v2.6.0
 [2.5.0]: https://github.com/SlipperSoar/SSRichText/compare/v2.4.0...v2.5.0

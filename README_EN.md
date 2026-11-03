@@ -46,7 +46,7 @@ https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText
 To pin a version, append a tag:
 
 ```text
-https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText#v2.7.0
+https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText#v2.8.0
 ```
 
 Or add it to `Packages/manifest.json` directly:
@@ -54,7 +54,7 @@ Or add it to `Packages/manifest.json` directly:
 ```json
 {
   "dependencies": {
-    "com.github-slippersoar.ssrichtext": "https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText#v2.7.0"
+    "com.github-slippersoar.ssrichtext": "https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText#v2.8.0"
   }
 }
 ```
@@ -194,6 +194,8 @@ Notes:
 
 - Icon names may contain letters, digits and `_`, `-`, `(`, `)`, `.`, `/`. Subfolders are supported: `<icon=Icons/heart/>` is `Resources.Load<Sprite>("Icons/heart")`, and `Icons\heart` is normalized to `/`. Spaces are not supported, and the extension must be omitted (`heart`, not `heart.png`).
 - An icon occupies one character cell and scales with the font size. When the icon is missing, the placeholder character stays transparent instead of showing a box.
+- Icons keep their original aspect ratio and are fitted inside the cell instead of being stretched. At most 16 shared icon atlases are kept by default (`RichTextIconImage.MaxSharedAtlasCount`); beyond that, new icon sets use a private atlas.
+- Built-in shaders live in `Runtime/Resources/SSRichText/` and are included in builds automatically, so they do not need to be added to Always Included Shaders. `Shader.Find` is still kept as a fallback for older installs.
 - `<shadow>` also applies to icons, with all four directions.
 
 ## GIF animations
@@ -245,7 +247,7 @@ GifLoadManager.Instance.AddGifData(
 
 - Legacy `Text` only; TextMeshPro is not supported.
 - Plain Text Extension blocks inside a GIF file are never drawn. They are metadata stored in the file (commonly copyright, author or description text), not text overlaid on the animation; the package parses and keeps them but does not render them.
-- Icons and GIFs occupy one character cell each; oversized images are squeezed into that cell.
+- Icons and GIFs occupy one character cell each; oversized images are scaled into that cell. Icons keep their aspect ratio and are fitted inside the cell instead of being stretched.
 - GIF decoding runs on a background thread by default and only texture uploads happen on the main thread; on platforms that fall back to the main thread (WebGL), very large GIFs block longer on first display.
 - Disabling `supportRichText` falls back to the native `Text` behavior and all extended tags stop working.
 

@@ -38,16 +38,18 @@ namespace SS.UIComponent
         private Material replaceMaterial;
 
         // 图标/动图集合没变时直接复用合并纹理，避免每次文本重建都重新 Blit
-        private string combineSignature;
+        private ulong combineSignature;
         private Dictionary<string, Vector4> cachedIconUvs;
         private Dictionary<string, Vector4> cachedGifUvs;
         private bool usingSingleGif;
 
         // 静态图标集合跨实例共享同一张图集：同一组表情在多个 RichText 上只合成一次
-        private static readonly Dictionary<string, SharedAtlas> SharedAtlases =
-            new Dictionary<string, SharedAtlas>(StringComparer.Ordinal);
+        private static readonly Dictionary<ulong, SharedAtlas> SharedAtlases = new Dictionary<ulong, SharedAtlas>();
 
-        private string sharedKey;
+        /// <summary>共享图集同时存在的上限，超过后新集合改用组件私有图集</summary>
+        public static int MaxSharedAtlasCount { get; set; } = 16;
+
+        private ulong sharedKey;
         private SharedAtlas sharedAtlas;
 
         private sealed class SharedAtlas
@@ -125,6 +127,15 @@ namespace SS.UIComponent
             // 纯静态图标：同一集合优先复用/共享图集
             if (canShare)
             {
+                // 达到共享上限后创建的私有图集，同一集合直接复用
+                if (rt != null && sharedAtlas == null && combineSignature == signature &&
+                    TryApplyCachedCombine())
+                {
+                    texture = rt;
+                    SetAllDirty();
+                    return;
+                }
+
                 if (sharedAtlas != null && sharedKey == signature && TryApplySharedAtlas())
                 {
                     texture = sharedAtlas.Texture;
@@ -151,6 +162,15 @@ namespace SS.UIComponent
                 {
                     ReleaseSharedAtlas();
                     texture = null;
+                    SetAllDirty();
+                    return;
+                }
+
+                // 活跃集合数量达到上限时不再进入静态缓存，改用组件私有图集
+                if (SharedAtlases.Count >= MaxSharedAtlasCount)
+                {
+                    combineSignature = signature;
+                    texture = rt;
                     SetAllDirty();
                     return;
                 }
@@ -182,7 +202,7 @@ namespace SS.UIComponent
 
             ReleaseRenderTexture();
             rt = CombineSprites(icons);
-            combineSignature = rt != null ? signature : null;
+            combineSignature = rt != null ? signature : 0UL;
             texture = rt;
             SetAllDirty();
         }
@@ -283,7 +303,7 @@ namespace SS.UIComponent
         /// </summary>
         private void ReleaseRenderTexture()
         {
-            combineSignature = null;
+            combineSignature = 0UL;
             cachedIconUvs = null;
             cachedGifUvs = null;
             _gifOffsetSclaes.Clear();
@@ -325,8 +345,7 @@ namespace SS.UIComponent
                     RenderTexture.ReleaseTemporary(sharedAtlas.Texture);
                 }
 
-                if (!string.IsNullOrEmpty(sharedKey) &&
-                    SharedAtlases.TryGetValue(sharedKey, out var registered) &&
+                if (SharedAtlases.TryGetValue(sharedKey, out var registered) &&
                     ReferenceEquals(registered, sharedAtlas))
                 {
                     SharedAtlases.Remove(sharedKey);
@@ -334,7 +353,7 @@ namespace SS.UIComponent
             }
 
             sharedAtlas = null;
-            sharedKey = null;
+            sharedKey = 0;
         }
 
         private bool TryApplySharedAtlas()
@@ -371,11 +390,15 @@ namespace SS.UIComponent
         }
 
         /// <summary>
-        /// 图标集合 + 动图集合的签名，用于判断合并纹理能否复用
+        /// 图标集合 + 动图集合的签名，用于判断合并纹理能否复用。
+        /// 使用无分配的 ulong 组合，避免每次重建拼接、排序字符串。
         /// </summary>
-        private string BuildCombineSignature(Dictionary<string, Sprite> icons)
+        private ulong BuildCombineSignature(Dictionary<string, Sprite> icons)
         {
-            var parts = new List<string>(_sprites.Count + _gifs.Count + 1);
+            var count = 0;
+            ulong sum = 0;
+            ulong xor = 0;
+
             foreach (var info in _sprites)
             {
                 if (!icons.TryGetValue(info.Content, out var sprite) || sprite == null)
@@ -383,21 +406,45 @@ namespace SS.UIComponent
                     continue;
                 }
 
-                parts.Add(info.Content + ":" + sprite.GetInstanceID());
+                var value = Mix(HashString('i', info.Content) ^ (ulong)sprite.GetInstanceID());
+                sum += value;
+                xor ^= value;
+                count++;
             }
 
-            parts.Sort(StringComparer.Ordinal);
-            parts.Add("#");
-
-            var gifParts = new List<string>(_gifs.Count);
             foreach (var gif in _gifs)
             {
-                gifParts.Add(gif.Key.Content);
+                var value = Mix(HashString('g', gif.Key.Content));
+                sum += value;
+                xor ^= value;
+                count++;
             }
 
-            gifParts.Sort(StringComparer.Ordinal);
-            parts.AddRange(gifParts);
-            return string.Join("|", parts);
+            return Mix(unchecked(sum ^ (xor << 1) ^ ((ulong)count * 0x9E3779B97F4A7C15UL)));
+        }
+
+        private static ulong HashString(char prefix, string value)
+        {
+            ulong hash = 14695981039346656037UL;
+            hash ^= prefix;
+            hash *= 1099511628211UL;
+            for (var i = 0; i < value.Length; i++)
+            {
+                hash ^= value[i];
+                hash *= 1099511628211UL;
+            }
+
+            return hash;
+        }
+
+        private static ulong Mix(ulong value)
+        {
+            value ^= value >> 33;
+            value *= 0xFF51AFD7ED558CCDUL;
+            value ^= value >> 33;
+            value *= 0xC4CEB9FE1A85EC53UL;
+            value ^= value >> 33;
+            return value;
         }
 
         /// <summary>
@@ -515,9 +562,28 @@ namespace SS.UIComponent
                    Mathf.Approximately(rect.height, spriteTexture.height);
         }
 
-        private RenderTexture CombineSprites(Dictionary<string, Sprite> icons)
+        /// <summary>
+        /// 优先从 Resources 读取（保证能被包含进构建），旧版本/自定义安装回退到 Shader.Find
+        /// </summary>
+        private static Shader LoadShader(string resourcePath, string shaderName)
         {
-            textureWidth = 0;
+            var shader = Resources.Load<Shader>(resourcePath);
+            if (shader == null)
+            {
+                shader = Shader.Find(shaderName);
+            }
+
+            if (shader == null)
+            {
+                Debug.LogError($"[SSRichText] Shader not found: {shaderName}. " +
+                               "Please add it to Resources or Graphics > Always Included Shaders.");
+            }
+
+            return shader;
+        }
+
+        private RenderTexture CombineSprites(Dictionary<string, Sprite> icons)
+        {            textureWidth = 0;
             textureHeight = 0;
 
             (textureWidth, textureHeight) =
@@ -535,7 +601,15 @@ namespace SS.UIComponent
 
             if (!blitMaterial)
             {
-                blitMaterial = new Material(Shader.Find("Custom/TextureCombineVert"));
+                var shader = LoadShader("SSRichText/TextureCombineVert", "Custom/TextureCombineVert");
+                if (shader == null)
+                {
+                    RenderTexture.active = prevRT;
+                    RenderTexture.ReleaseTemporary(renderTexture);
+                    return null;
+                }
+
+                blitMaterial = new Material(shader);
             }
 
             var totalWidth = (float)textureWidth;
@@ -928,7 +1002,13 @@ namespace SS.UIComponent
             // 用不混合的材质整块覆盖 GIF 子区域：否则半透明帧会和上一帧叠加出残影
             if (replaceMaterial == null)
             {
-                replaceMaterial = new Material(Shader.Find("Custom/TextureCombineReplace"));
+                var shader = LoadShader("SSRichText/TextureCombineReplace", "Custom/TextureCombineReplace");
+                if (shader == null)
+                {
+                    return;
+                }
+
+                replaceMaterial = new Material(shader);
             }
 
             replaceMaterial.SetVector(OffsetScale, offsetScale);

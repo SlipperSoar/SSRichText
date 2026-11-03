@@ -197,7 +197,53 @@ namespace SS.UIComponent
                 return (null, null);
             }
 
+            FitIconToCell(iconVerts, iconSprite);
             return (iconSprite, iconVerts);
+        }
+
+        /// <summary>
+        /// 在字符格内按 Sprite 原始比例内切，避免非方形图标被拉伸
+        /// </summary>
+        private static void FitIconToCell(UIVertex[] verts, Sprite sprite)
+        {
+            var minX = Mathf.Min(Mathf.Min(verts[0].position.x, verts[1].position.x),
+                Mathf.Min(verts[2].position.x, verts[3].position.x));
+            var maxX = Mathf.Max(Mathf.Max(verts[0].position.x, verts[1].position.x),
+                Mathf.Max(verts[2].position.x, verts[3].position.x));
+            var minY = Mathf.Min(Mathf.Min(verts[0].position.y, verts[1].position.y),
+                Mathf.Min(verts[2].position.y, verts[3].position.y));
+            var maxY = Mathf.Max(Mathf.Max(verts[0].position.y, verts[1].position.y),
+                Mathf.Max(verts[2].position.y, verts[3].position.y));
+
+            var cellWidth = maxX - minX;
+            var cellHeight = maxY - minY;
+            var spriteAspect = sprite.rect.width / sprite.rect.height;
+            if (cellWidth <= 0f || cellHeight <= 0f || spriteAspect <= 0f)
+            {
+                return;
+            }
+
+            var cellAspect = cellWidth / cellHeight;
+            var scaleX = 1f;
+            var scaleY = 1f;
+            if (spriteAspect > cellAspect)
+            {
+                scaleY = cellAspect / spriteAspect;
+            }
+            else
+            {
+                scaleX = spriteAspect / cellAspect;
+            }
+
+            var centerX = (minX + maxX) * 0.5f;
+            var centerY = (minY + maxY) * 0.5f;
+            for (var i = 0; i < verts.Length; i++)
+            {
+                var position = verts[i].position;
+                position.x = centerX + (position.x - centerX) * scaleX;
+                position.y = centerY + (position.y - centerY) * scaleY;
+                verts[i].position = position;
+            }
         }
 
         /// <summary>
