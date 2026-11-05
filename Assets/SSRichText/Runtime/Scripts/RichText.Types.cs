@@ -94,13 +94,39 @@ namespace SS.UIComponent
             /// 富文本区域对应的所有矩形
             /// x, y => 左下， z, w => 右上
             /// </summary>
-            public List<Vector4> Rects;
+            public List<Vector4> Rects = new List<Vector4>();
 
             /// <summary>
             /// 富文本区域对应的每个矩形的起止索引
             /// 0 => 开始索引， 1 => 结束索引
             /// </summary>
-            public List<int[]> RectIndexes;
+            public List<int[]> RectIndexes = new List<int[]>();
+
+            /// <summary>复用前清空区域数据（对象本身由重建缓冲池持有，不重新分配）。</summary>
+            public void ResetRects()
+            {
+                Rects.Clear();
+                // RectIndexes 里的 int[] 会在下次 ResetRects 时复用：把旧数组留作池，
+                // 用 m_IndexPool 记录可复用下标，避免重新分配。
+                RectIndexes.Clear();
+                m_IndexUsed = 0;
+            }
+
+            private int m_IndexUsed;
+
+            /// <summary>取一个二元素索引数组；优先复用本对象上次的数组。</summary>
+            public int[] RentIndexes()
+            {
+                if (m_IndexUsed < m_IndexPool.Count)
+                    return m_IndexPool[m_IndexUsed++];
+
+                var pair = new int[2];
+                m_IndexPool.Add(pair);
+                m_IndexUsed++;
+                return pair;
+            }
+
+            private readonly List<int[]> m_IndexPool = new List<int[]>();
         }
         
         public class ShadowRichInfo : RichInfo

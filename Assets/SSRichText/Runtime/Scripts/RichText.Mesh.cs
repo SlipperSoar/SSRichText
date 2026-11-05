@@ -166,7 +166,7 @@ namespace SS.UIComponent
 
             var start = richInfo.StartIndex * 4;
             var end = start + 4;
-            var iconVerts = new UIVertex[4];
+            var iconVerts = m_PendingBuffers.RentQuad();
             // 图标一定是单个字符，这里把uv收缩50%应该会很合适
             // index + 2 一定是对角
             var vert1 = verts[start];
@@ -264,7 +264,7 @@ namespace SS.UIComponent
 
             var start = richInfo.StartIndex * 4;
             var end = start + 4;
-            var gifVerts = new UIVertex[4];
+            var gifVerts = m_PendingBuffers.RentQuad();
             // 图标一定是单个字符，这里把uv收缩50%应该会很合适
             // index + 2 一定是对角
             var vert1 = verts[start];
@@ -335,7 +335,7 @@ namespace SS.UIComponent
                 }
                 
                 // 划线的四个顶点
-                var lineVerts = new UIVertex[4];
+                var lineVerts = m_PendingBuffers.RentQuad();
                 float basedY = 0;
                 switch (lineRichInfo.BasedPos)
                 {
@@ -481,13 +481,12 @@ namespace SS.UIComponent
 
         private static void CalculateRects(RichInfo richInfo, IList<UIVertex> vertices, int vertCount)
         {
-            richInfo.Rects = new List<Vector4>();
-            richInfo.RectIndexes = new List<int[]>();
+            richInfo.ResetRects();
             var startIndex = richInfo.StartIndex;
             var endIndex = richInfo.EndIndex;
 
             Vector4 rect = -Vector4.one;
-            int[] indexes = new int[2];
+            int[] indexes = richInfo.RentIndexes();
             // 0: 找开始， 1: 找结束
             var state = 0;
             // 顶点是从左上的顺时针
@@ -543,7 +542,7 @@ namespace SS.UIComponent
 
                             // 重置一下，继续找下一个
                             rect = -Vector4.one;
-                            indexes = new int[2];
+                            indexes = richInfo.RentIndexes();
                             // 避免换行后的第一个字符没被算入开头，这里计算完上一行的闭口后回退一步
                             i--;
                         }
@@ -564,7 +563,7 @@ namespace SS.UIComponent
         }
 
         private static IList<UIVertex> ProcessRawTags(IList<UIVertex> vertices, string resultText,
-            string textWithoutTag)
+            string textWithoutTag, List<UIVertex> scratch)
         {
             // 得先确认顶点是否需要修改
             if (vertices.Count == textWithoutTag.Length * 4)
@@ -572,8 +571,8 @@ namespace SS.UIComponent
                 return vertices;
             }
 
-            // 通过记录的标签信息得到真实的顶点信息
-            var newVertices = new List<UIVertex>(vertices.Count);
+            // 通过记录的标签信息得到真实的顶点信息；scratch 由调用方池化复用
+            scratch.Clear();
             for (int i = 0, j = 0; i < resultText.Length; i++)
             {
                 var char1 = resultText[i];
@@ -590,13 +589,13 @@ namespace SS.UIComponent
                 }
 
                 j++;
-                newVertices.Add(vertices[i * 4]);
-                newVertices.Add(vertices[i * 4 + 1]);
-                newVertices.Add(vertices[i * 4 + 2]);
-                newVertices.Add(vertices[i * 4 + 3]);
+                scratch.Add(vertices[i * 4]);
+                scratch.Add(vertices[i * 4 + 1]);
+                scratch.Add(vertices[i * 4 + 2]);
+                scratch.Add(vertices[i * 4 + 3]);
             }
 
-            return newVertices;
+            return scratch;
         }
 
     }

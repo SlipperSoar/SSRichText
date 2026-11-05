@@ -46,7 +46,7 @@ https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText
 需要固定版本时在末尾追加 tag，例如：
 
 ```text
-https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText#v2.8.0
+https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText#v2.9.0
 ```
 
 也可以直接写进 `Packages/manifest.json`：
@@ -54,7 +54,7 @@ https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText#v2.8.0
 ```json
 {
   "dependencies": {
-    "com.github-slippersoar.ssrichtext": "https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText#v2.8.0"
+    "com.github-slippersoar.ssrichtext": "https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText#v2.9.0"
   }
 }
 ```

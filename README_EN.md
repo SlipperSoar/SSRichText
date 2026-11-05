@@ -46,7 +46,7 @@ https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText
 To pin a version, append a tag:
 
 ```text
-https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText#v2.8.0
+https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText#v2.9.0
 ```
 
 Or add it to `Packages/manifest.json` directly:
@@ -54,7 +54,7 @@ Or add it to `Packages/manifest.json` directly:
 ```json
 {
   "dependencies": {
-    "com.github-slippersoar.ssrichtext": "https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText#v2.8.0"
+    "com.github-slippersoar.ssrichtext": "https://github.com/SlipperSoar/SSRichText.git?path=/Assets/SSRichText#v2.9.0"
   }
 }
 ```

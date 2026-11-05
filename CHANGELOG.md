@@ -4,6 +4,15 @@
 
 ## [Unreleased]
 
+## [2.9.0] - 2026-11-05
+
+### Changed
+
+- 富文本重建改为实例级容器池（`RichTextRebuildBuffers`）：打字机式逐帧重建复用 `RichInfo`、`List`、`Dictionary` 和顶点列表，减少每帧 GC。
+- `CloneRichInfos` 按位置复用 `RichInfo` 对象；`Rects` / `RectIndexes` 支持复用，避免每帧重新分配矩形列表和索引数组。
+- `ProcessRawTags` 使用池化临时列表；点击检测去掉 LINQ 和临时 `List`。
+- 图标层保持 pending / active 所有权分离：active 缓冲在图标层真正替换前不会回池，避免 GIF 读到被覆盖的顶点数据。
+
 ## [2.8.0] - 2026-11-03
 
 ### Changed
@@ -196,7 +205,8 @@
 
 - 首个版本：基于 Unity 原生 UI Text 的富文本组件。
 
-[Unreleased]: https://github.com/SlipperSoar/SSRichText/compare/v2.8.0...HEAD
+[Unreleased]: https://github.com/SlipperSoar/SSRichText/compare/v2.9.0...HEAD
+[2.9.0]: https://github.com/SlipperSoar/SSRichText/compare/v2.8.0...v2.9.0
 [2.8.0]: https://github.com/SlipperSoar/SSRichText/compare/v2.7.0...v2.8.0
 [2.7.0]: https://github.com/SlipperSoar/SSRichText/compare/v2.6.0...v2.7.0
 [2.6.0]: https://github.com/SlipperSoar/SSRichText/compare/v2.5.0...v2.6.0

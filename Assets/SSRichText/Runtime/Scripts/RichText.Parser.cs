@@ -446,53 +446,55 @@ namespace SS.UIComponent
         }
 
         /// <summary>
-        /// 复制一份解析结果：缓存里保存的是模板，网格构建和图标更新协程只操作副本
+        /// 把解析模板覆盖到复用列表里：目标列表里的 RichInfo 对象随重建缓冲池长期复用，
+        /// 只有数量不够时才按源类型新建。网格构建与图标层的写入只落在这些副本上。
         /// </summary>
-        private static List<RichInfo> CloneRichInfos(List<RichInfo> source)
+        private static void CloneRichInfos(List<RichInfo> source, List<RichInfo> dest)
         {
-            var result = new List<RichInfo>(source.Count);
-            foreach (var info in source)
+            for (int i = 0; i < source.Count; i++)
             {
-                result.Add(CloneRichInfo(info));
+                RichInfo template = source[i];
+                RichInfo clone;
+
+                if (i < dest.Count && dest[i].GetType() == template.GetType())
+                {
+                    clone = dest[i];
+                }
+                else
+                {
+                    clone = CreateRichInfo(template);
+                    if (i < dest.Count)
+                        dest[i] = clone;
+                    else
+                        dest.Add(clone);
+                }
+
+                CopyRichInfo(template, clone);
+                clone.ResetRects();
             }
 
-            return result;
+            // 模板变短时，把多出来的对象留在池里（下次数量回升可复用），只收缩有效长度
+            if (dest.Count > source.Count)
+                dest.RemoveRange(source.Count, dest.Count - source.Count);
         }
 
-        private static RichInfo CloneRichInfo(RichInfo source)
+        private static RichInfo CreateRichInfo(RichInfo source)
         {
-            RichInfo clone;
             switch (source)
             {
-                case ShadowRichInfo shadow:
-                    clone = new ShadowRichInfo
-                    {
-                        IsXPositive = shadow.IsXPositive,
-                        IsYPositive = shadow.IsYPositive,
-                    };
-                    break;
-                case DrawingLineRichInfo line:
-                    clone = new DrawingLineRichInfo
-                    {
-                        LineHeight = line.LineHeight,
-                        YPosFromBase = line.YPosFromBase,
-                        BasedPos = line.BasedPos,
-                    };
-                    break;
-                case GradientRichInfo gradient:
-                    clone = new GradientRichInfo
-                    {
-                        LeftTopColor = gradient.LeftTopColor,
-                        RightTopColor = gradient.RightTopColor,
-                        LeftBottomColor = gradient.LeftBottomColor,
-                        RightBottomColor = gradient.RightBottomColor,
-                    };
-                    break;
+                case ShadowRichInfo _:
+                    return new ShadowRichInfo();
+                case DrawingLineRichInfo _:
+                    return new DrawingLineRichInfo();
+                case GradientRichInfo _:
+                    return new GradientRichInfo();
                 default:
-                    clone = new RichInfo();
-                    break;
+                    return new RichInfo();
             }
+        }
 
+        private static void CopyRichInfo(RichInfo source, RichInfo clone)
+        {
             clone.Type = source.Type;
             clone.StartIndex = source.StartIndex;
             clone.EndIndex = source.EndIndex;
@@ -500,7 +502,24 @@ namespace SS.UIComponent
             clone.Color = source.Color;
             clone.EffectedStr = source.EffectedStr;
 
-            return clone;
+            switch (source)
+            {
+                case ShadowRichInfo shadow when clone is ShadowRichInfo s:
+                    s.IsXPositive = shadow.IsXPositive;
+                    s.IsYPositive = shadow.IsYPositive;
+                    break;
+                case DrawingLineRichInfo line when clone is DrawingLineRichInfo d:
+                    d.LineHeight = line.LineHeight;
+                    d.YPosFromBase = line.YPosFromBase;
+                    d.BasedPos = line.BasedPos;
+                    break;
+                case GradientRichInfo gradient when clone is GradientRichInfo g:
+                    g.LeftTopColor = gradient.LeftTopColor;
+                    g.RightTopColor = gradient.RightTopColor;
+                    g.LeftBottomColor = gradient.LeftBottomColor;
+                    g.RightBottomColor = gradient.RightBottomColor;
+                    break;
+            }
         }
 
         private List<TagInfo> GetTags(string richText, Regex tagRegex, RichType richType, bool isCloseTag = false,
